@@ -199,4 +199,7 @@ run.py             9635 端口启动入口
 
 ## 许可证 / License
 
-[Available License](https://license.kscm.top/available.md)
+本项目采用 [Available License](LICENSE.md)（全文见仓库根目录 `LICENSE.md`）。
+This project is licensed under the [Available License](LICENSE.md) (full text in `LICENSE.md`).
+
+> 原文出处 / Source: https://license.kscm.top/available.md
