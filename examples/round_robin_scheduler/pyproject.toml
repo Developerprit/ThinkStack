@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thinkstack-round-robin-scheduler"
+version = "1.0.0"
+description = "ThinkStack 示例扩展：基于时间片轮转的调度器"
+requires-python = ">=3.10"
+dependencies = [
+    "thinkstack>=1.0.0",
+]
+
+[tool.setuptools]
+py-modules = ["round_robin"]
+
+# 接入方式（代码示例）：
+#   from thinkstack import ThinkStack
+#   stack = ThinkStack()
+#   stack.register_extension("round_robin", "/path/to/round_robin.py")
+#   stack.start()  # 应用后可通过 stack.custom_schedulers 获取该调度器实例
+#   scheduler = stack.custom_schedulers[-1]
+#   scheduler.submit(Task(name="t1", func=some_step_generator))
+#   results = scheduler.run_all()

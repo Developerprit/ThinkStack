@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# 测试与工具缓存
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 运行时产物
+*.db
+*.sqlite3
+
+# 打包产物（源码仓库不提交 zip）
+ThinkStack.zip
+
+# IDE / 编辑器
+.idea/
+.vscode/
+*.swp
+
+# 工作空间数据
+.workbuddy/

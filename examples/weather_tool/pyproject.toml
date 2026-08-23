@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thinkstack-weather-tool"
+version = "1.0.0"
+description = "ThinkStack 示例扩展：天气查询工具"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+    "thinkstack>=1.0.0",
+]
+
+[tool.setuptools]
+py-modules = ["weather"]
+
+# 接入方式（代码示例）：
+#   from thinkstack import ThinkStack, register_extension
+#   stack = ThinkStack()
+#   stack.register_extension("weather", "/path/to/weather.py")
+#   stack.start()  # 应用组件扩展后即可通过 stack.call_tool("weather", city="北京") 调用

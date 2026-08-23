@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ThinkStack — 一切皆为可编写的扩展 · Agent Framework</title>
+<meta name="description" content="ThinkStack 是一个模型无关、可扩展的 Python 3 Agent 框架。通过统一的 Expand API，将 Agent 核心、工具、记忆与调度器全部开放为可编写的扩展。" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+/* ============ 主题变量 ============ */
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --surface-2: #eef2f7;
+  --text: #0f172a;
+  --text-muted: #475569;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --primary: #2563eb;
+  --primary-2: #3b82f6;
+  --accent: #0ea5e9;
+  --code-bg: #0f172a;
+  --code-text: #e2e8f0;
+  --grid-line: rgba(15, 23, 42, .05);
+}
+html[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #16213a;
+  --text: #f1f5f9;
+  --text-muted: #94a3b8;
+  --border: #334155;
+  --border-strong: #475569;
+  --primary: #3b82f6;
+  --primary-2: #60a5fa;
+  --accent: #38bdf8;
+  --code-bg: #0b1120;
+  --code-text: #e2e8f0;
+  --grid-line: rgba(148, 163, 184, .07);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: "IBM Plex Sans", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  transition: background .25s, color .25s;
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+.mono { font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace; }
+
+/* 点阵网格背景装饰 */
+.grid-bg {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image: radial-gradient(var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), transparent 70%);
+}
+.wrap { position: relative; z-index: 1; }
+
+/* ============ 顶栏 ============ */
+header {
+  position: sticky; top: 16px; z-index: 50;
+  max-width: 1200px; margin: 0 auto; padding: 0 24px;
+}
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 18px;
+  box-shadow: 0 8px 24px rgba(15,23,42,.08);
+}
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+.logo .mark {
+  width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center;
+  background: var(--primary); color: #fff; font-size: 15px; font-weight: 700;
+}
+.logo .sub { color: var(--primary); font-weight: 500; }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: var(--text-muted); font-size: 14px; font-weight: 500; transition: color .2s; }
+.nav-links a:hover { color: var(--text); }
+.nav-actions { display: flex; gap: 10px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 18px; border-radius: 9px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; transition: all .2s; white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-2); transform: translateY(-1px); }
+.btn-ghost { border-color: var(--border-strong); color: var(--text); background: transparent; }
+.btn-ghost:hover { border-color: var(--primary); color: var(--primary); }
+.icon-btn {
+  width: 38px; height: 38px; border-radius: 9px; display: grid; place-items: center;
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text);
+  cursor: pointer; transition: all .2s;
+}
+.icon-btn:hover { border-color: var(--primary); color: var(--primary); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+/* ============ Hero ============ */
+.hero { max-width: 1200px; margin: 0 auto; padding: 88px 24px 40px; }
+.hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; }
+.kicker {
+  display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500;
+  color: var(--primary); border: 1px solid var(--border); background: var(--surface);
+  padding: 5px 12px; border-radius: 20px; margin-bottom: 22px;
+}
+.kicker .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--primary); animation: pulse 1.6s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+.hero h1 {
+  font-family: "JetBrains Mono", monospace; font-size: 54px; line-height: 1.1;
+  font-weight: 700; letter-spacing: -1px; margin-bottom: 20px;
+}
+.hero h1 .grad {
+  background: linear-gradient(120deg, var(--primary), var(--accent));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.hero p.lead { font-size: 18px; color: var(--text-muted); max-width: 520px; margin-bottom: 32px; }
+.hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
+.hero-stats { display: flex; gap: 40px; margin-top: 44px; }
+.stat .num { font-family: "JetBrains Mono", monospace; font-size: 26px; font-weight: 700; color: var(--text); }
+.stat .lbl { font-size: 13px; color: var(--text-muted); }
+
+/* 终端窗口 */
+.terminal {
+  background: var(--code-bg); border-radius: 12px; border: 1px solid var(--border);
+  overflow: hidden; box-shadow: 0 24px 60px rgba(15,23,42,.28);
+}
+.term-bar { display: flex; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid rgba(148,163,184,.15); }
+.term-bar .dot { width: 11px; height: 11px; border-radius: 50%; }
+.term-bar .t { margin-left: 8px; color: #64748b; font-size: 12px; font-family: "JetBrains Mono", monospace; }
+.term-body { padding: 20px; font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--code-text); line-height: 1.8; }
+.term-body .p { color: #64748b; }
+.term-body .c { color: #34d399; }
+.term-body .k { color: #60a5fa; }
+.term-body .s { color: #fbbf24; }
+.cursor { display: inline-block; width: 8px; height: 16px; background: #60a5fa; vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ============ 分区标题 ============ */
+section { max-width: 1200px; margin: 0 auto; padding: 72px 24px; }
+.sec-head { margin-bottom: 44px; }
+.sec-tag { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--primary); letter-spacing: 1px; text-transform: uppercase; }
+.sec-head h2 { font-family: "JetBrains Mono", monospace; font-size: 36px; font-weight: 700; margin-top: 8px; letter-spacing: -.5px; }
+.sec-head p { color: var(--text-muted); margin-top: 12px; max-width: 640px; }
+
+/* ============ 特性块 ============ */
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.feature {
+  border: 1px solid var(--border); border-radius: 14px; padding: 26px;
+  background: var(--surface); position: relative; transition: all .2s; cursor: pointer;
+}
+.feature:hover { border-color: var(--primary); transform: translateY(-3px); box-shadow: 0 14px 34px rgba(15,23,42,.1); }
+.feature .idx { font-family: "JetBrains Mono", monospace; color: var(--text-muted); font-size: 13px; }
+.feature .ic { width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); margin: 18px 0 16px; }
+.feature .ic svg { width: 22px; height: 22px; color: var(--primary); }
+.feature h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+.feature p { color: var(--text-muted); font-size: 14px; }
+
+/* ============ 架构层 ============ */
+.arch { display: flex; flex-direction: column; gap: 12px; }
+.arch-layer {
+  display: flex; align-items: center; gap: 20px; border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px 24px; background: var(--surface); transition: all .2s;
+}
+.arch-layer:hover { border-color: var(--primary); }
+.arch-layer .lname { font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 15px; width: 190px; flex-shrink: 0; }
+.arch-layer .ltag { font-size: 12px; color: var(--primary); }
+.arch-layer .ldesc { color: var(--text-muted); font-size: 14px; flex: 1; }
+.arch-layer .lmods { display: flex; gap: 6px; flex-wrap: wrap; }
+.arch-layer .m { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 4px 9px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border); }
+
+/* ============ 扩展点 ============ */
+.hooks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.hook {
+  display: flex; align-items: center; gap: 10px; padding: 13px 16px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--surface); font-family: "JetBrains Mono", monospace; font-size: 12.5px;
+  cursor: pointer; transition: all .2s;
+}
+.hook:hover { border-color: var(--primary); color: var(--primary); }
+.hook .dot { width: 8px; height: 8px; border-radius: 2px; background: var(--primary); flex-shrink: 0; }
+
+/* ============ 快速开始 ============ */
+.quick { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.code-block { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+.code-block .cb-head { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-muted); font-size: 12px; font-family: "JetBrains Mono", monospace; background: var(--surface-2); }
+.code-block pre { background: var(--code-bg); color: var(--code-text); padding: 18px; font-size: 13px; overflow-x: auto; font-family: "JetBrains Mono", monospace; line-height: 1.7; }
+
+/* ============ CTA ============ */
+.cta {
+  max-width: 1200px; margin: 0 auto 72px; padding: 0 24px;
+}
+.cta-box {
+  border: 1px solid var(--border); border-radius: 18px; padding: 60px 40px; text-align: center;
+  background: var(--surface); position: relative; overflow: hidden;
+}
+.cta-box::before { content: ""; position: absolute; inset: 0; background: radial-gradient(600px circle at 50% -20%, rgba(59,130,246,.18), transparent 60%); }
+.cta-box h2 { font-family: "JetBrains Mono", monospace; font-size: 34px; font-weight: 700; position: relative; }
+.cta-box p { color: var(--text-muted); margin: 16px 0 30px; position: relative; }
+.cta-box .hero-cta { justify-content: center; position: relative; }
+
+/* ============ Footer ============ */
+footer { border-top: 1px solid var(--border); padding: 40px 24px; }
+.foot { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+.foot .fl { color: var(--text-muted); font-size: 13px; }
+.foot .fl a { color: var(--primary); }
+
+/* ============ 响应式 ============ */
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .features, .hooks { grid-template-columns: 1fr 1fr; }
+  .quick { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+  .hero h1 { font-size: 40px; }
+}
+@media (max-width: 560px) {
+  .features, .hooks { grid-template-columns: 1fr; }
+  .arch-layer { flex-direction: column; align-items: flex-start; }
+  .arch-layer .lname { width: auto; }
+  .hero h1 { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="wrap">
+
+<header>
+  <nav class="nav">
+    <a class="logo" href="#">
+      <span class="mark">T</span>
+      <span>ThinkStack <span class="sub">· Agent Framework</span></span>
+    </a>
+    <div class="nav-links">
+      <a href="#features">特性</a>
+      <a href="#architecture">架构</a>
+      <a href="#hooks">扩展点</a>
+      <a href="#quickstart">快速开始</a>
+    </div>
+    <div class="nav-actions">
+      <button class="icon-btn" id="themeToggle" aria-label="切换主题" title="切换主题">
+        <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+      <a class="btn btn-primary" href="#quickstart">开始使用</a>
+    </div>
+  </nav>
+</header>
+
+<div class="hero">
+  <div class="hero-grid">
+    <div>
+      <span class="kicker"><span class="pulse"></span> Python 3.10+ · 模型无关 · 开源</span>
+      <h1>一切皆为<br /><span class="grad">可编写的扩展</span></h1>
+      <p class="lead">ThinkStack 是一个 Python 3 Agent 框架。通过统一的 Expand API，把 Agent 核心、工具、记忆与调度器全部开放为可编写的扩展——任何人都能接入，构建属于自己的 Agent 应用。</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary" href="#quickstart">快速开始 →</a>
+        <a class="btn btn-ghost" href="#architecture">了解架构</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="num">9</div><div class="lbl">扩展点 Hooks</div></div>
+        <div class="stat"><div class="num">4</div><div class="lbl">层架构 Layers</div></div>
+        <div class="stat"><div class="num">28</div><div class="lbl">单元测试 Tests</div></div>
+      </div>
+    </div>
+    <div class="terminal">
+      <div class="term-bar">
+        <span class="dot" style="background:#ff5f57"></span>
+        <span class="dot" style="background:#febc2e"></span>
+        <span class="dot" style="background:#28c840"></span>
+        <span class="t">thinkstack — 9635</span>
+      </div>
+      <div class="term-body">
+        <div><span class="p">$</span> python run.py</div>
+        <div><span class="c">✓</span> ThinkStack REST API : http://0.0.0.0:9635</div>
+        <div><span class="p">$</span> curl -X POST .../api/agent/run <span class="s">\</span></div>
+        <div>  -d <span class="s">'{"agent":"echo","input":"你好"}'</span></div>
+        <div><span class="k">→</span> {<span class="s">"success"</span>: true, ...}</div>
+        <div><span class="p">$</span> curl -X POST .../api/command <span class="s">\</span></div>
+        <div>  -d <span class="s">'{"command":"webrun 8080"}'</span></div>
+        <div><span class="k">→</span> Web 控制台 : http://localhost:8080</div>
+        <div><span class="p">$</span> <span class="cursor"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section id="features">
+  <div class="sec-head">
+    <div class="sec-tag">// 01 · Features</div>
+    <h2>一个框架，全部可扩展</h2>
+    <p>不再被写死的组件束缚。每个核心能力都通过 Expand API 开放，扩展即代码。</p>
+  </div>
+  <div class="features">
+    <div class="feature">
+      <div class="idx">/01</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 3-5"/></svg></div>
+      <h3>四层架构</h3>
+      <p>Core / Expand API / Extension / Runtime 四层清晰分离，依赖单向，职责明确。</p>
+    </div>
+    <div class="feature">
+      <div class="idx">/02</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg></div>
+      <h3>模型无关</h3>
+      <p>不绑定任何 AI 模型 SDK，think 只依赖可插拔的推理后端抽象，自由替换。</p>
+    </div>
+    <div class="feature">
+      <div class="idx">/03</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
+      <h3>统一 Expand API</h3>
+      <p>@expand_hook 装饰器 + register_extension，九个扩展点覆盖完整生命周期。</p>
+    </div>
+    <div class="feature">
+      <div class="idx">/04</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <h3>安全隔离</h3>
+      <p>扩展加载与执行异常被隔离，单扩展失败不影响框架与其他扩展，越权访问被拦截。</p>
+    </div>
+    <div class="feature">
+      <div class="idx">/05</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <h3>三种调度策略</h3>
+      <p>串行、并行、优先级队列开箱即用，也可实现自定义调度器无缝接入。</p>
+    </div>
+    <div class="feature">
+      <div class="idx">/06</div>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg></div>
+      <h3>内置运行时</h3>
+      <p>9635 端口提供 REST API，webrun 命令动态开启浅/深色 Web 控制台。</p>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="sec-head">
+    <div class="sec-tag">// 02 · Architecture</div>
+    <h2>四层架构</h2>
+    <p>从核心逻辑到运行时加载，每一层都可被扩展替换。</p>
+  </div>
+  <div class="arch">
+    <div class="arch-layer">
+      <div class="lname">Extension Layer<span class="ltag"> 扩展实现</span></div>
+      <div class="ldesc">开发者编写的自定义扩展：工具、记忆后端、调度策略。</div>
+      <div class="lmods"><span class="m">weather</span><span class="m">sqlite_memory</span><span class="m">round_robin</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="lname">Expand API Layer<span class="ltag"> 扩展接口</span></div>
+      <div class="ldesc">统一的扩展入口：@expand_hook、register_extension、ExtensionHandle。</div>
+      <div class="lmods"><span class="m">ExpandHook</span><span class="m">ExtensionLoader</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="lname">Core Layer<span class="ltag"> 核心逻辑</span></div>
+      <div class="ldesc">Agent 循环、工具注册表、记忆、调度器、推理后端。</div>
+      <div class="lmods"><span class="m">ThinkStack</span><span class="m">Agent</span><span class="m">Tool</span><span class="m">Memory</span><span class="m">Scheduler</span></div>
+    </div>
+    <div class="arch-layer">
+      <div class="lname">Runtime Layer<span class="ltag"> 运行时加载</span></div>
+      <div class="ldesc">HTTP REST API 与 Web 控制台，负责对外通信与扩展加载。</div>
+      <div class="lmods"><span class="m">ThinkStackServer</span><span class="m">WebConsole</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="hooks">
+  <div class="sec-head">
+    <div class="sec-tag">// 03 · Expand Hooks</div>
+    <h2>九个扩展点</h2>
+    <p>把函数挂到任意生命周期节点，或注册自定义组件。</p>
+  </div>
+  <div class="hooks">
+    <div class="hook"><span class="dot"></span>HOOK_BEFORE_THINK</div>
+    <div class="hook"><span class="dot"></span>HOOK_AFTER_THINK</div>
+    <div class="hook"><span class="dot"></span>HOOK_BEFORE_ACTION</div>
+    <div class="hook"><span class="dot"></span>HOOK_AFTER_ACTION</div>
+    <div class="hook"><span class="dot"></span>HOOK_BEFORE_OBSERVE</div>
+    <div class="hook"><span class="dot"></span>HOOK_AFTER_OBSERVE</div>
+    <div class="hook"><span class="dot"></span>HOOK_CUSTOM_TOOL</div>
+    <div class="hook"><span class="dot"></span>HOOK_CUSTOM_MEMORY</div>
+    <div class="hook"><span class="dot"></span>HOOK_CUSTOM_SCHEDULER</div>
+  </div>
+</section>
+
+<section id="quickstart">
+  <div class="sec-head">
+    <div class="sec-tag">// 04 · Quick Start</div>
+    <h2>快速开始</h2>
+    <p>一条命令启动，任何人都能接入 9635 端口构建 Agent 应用。</p>
+  </div>
+  <div class="quick">
+    <div class="code-block">
+      <div class="cb-head">启动框架</div>
+      <pre>python run.py
+# ThinkStack REST API
+#   http://0.0.0.0:9635</pre>
+    </div>
+    <div class="code-block">
+      <div class="cb-head">调用 REST API</div>
+      <pre>curl -X POST .../api/agent/run \
+ -d '{"agent":"echo","input":"你好"}'
+curl -X POST .../api/command \
+ -d '{"command":"webrun 8080"}'</pre>
+    </div>
+    <div class="code-block">
+      <div class="cb-head">用代码接入</div>
+      <pre>from thinkstack import ThinkStack, EchoAgent
+stack = ThinkStack()
+stack.start()
+stack.run_agent(EchoAgent(), "你好")</pre>
+    </div>
+    <div class="code-block">
+      <div class="cb-head">编写扩展</div>
+      <pre>@expand_hook(ExpandHook.HOOK_CUSTOM_TOOL)
+def register_tool():
+    return FunctionTool(
+      name="weather", ...)</pre>
+    </div>
+  </div>
+</section>
+
+<div class="cta">
+  <div class="cta-box">
+    <h2>开始构建你的 Agent 应用</h2>
+    <p>ThinkStack 开源、模型无关、可扩展。运行即接入。</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary" href="#">下载 / Download</a>
+      <a class="btn btn-ghost" href="#">查看文档</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot">
+    <div class="fl">© 2026 ThinkStack · 许可：<a href="https://license.kscm.top/available.md" target="_blank" rel="noopener">Available License</a></div>
+    <div class="fl mono">Everything is a writable extension.</div>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var toggle = document.getElementById("themeToggle");
+  var iconMoon = document.getElementById("iconMoon");
+  var iconSun = document.getElementById("iconSun");
+
+  function apply(theme) {
+    root.setAttribute("data-theme", theme);
+    iconMoon.style.display = theme === "dark" ? "none" : "block";
+    iconSun.style.display = theme === "dark" ? "block" : "none";
+  }
+  var saved = localStorage.getItem("ts-site-theme") || "dark";
+  apply(saved);
+  toggle.addEventListener("click", function () {
+    var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    localStorage.setItem("ts-site-theme", next);
+    apply(next);
+  });
+})();
+</script>
+</body>
+</html>

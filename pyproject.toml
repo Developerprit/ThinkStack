@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thinkstack"
+version = "1.0.0"
+description = "ThinkStack —— 一个「一切皆为可编写的扩展」的 Python 3 Agent 框架"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Available License (https://license.kscm.top/available.md)" }
+authors = [{ name = "kscm", email = "qwertyuiop12365288@163.com" }]
+dependencies = [
+    "pydantic>=2.0",
+    "typing-extensions>=4.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["thinkstack*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
