@@ -197,6 +197,15 @@ run.py             9635 端口启动入口
 
 ---
 
+## 文档导航 / Documentation
+
+- [API 参考 / API Reference](docs/API_REFERENCE.md) — 全部公开类、函数、枚举的签名与最小示例
+- [实施计划 / Planning](Planning/Planning.md) — 四层架构设计与技术决策
+- [许可证 / License](LICENSE.md) — Available License 全文
+- [需求说明 / Requirements](要求.md) — 原始需求文档
+
+---
+
 ## 许可证 / License
 
 本项目采用 [Available License](LICENSE.md)（全文见仓库根目录 `LICENSE.md`）。
