@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "thinkstack-markdown-agent"
+version = "1.0.0"
+description = "ThinkStack 示例扩展：Markdown 渲染 Agent（HOOK_CUSTOM_AGENT）"
+requires-python = ">=3.10"
+dependencies = [
+    "thinkstack>=1.1.0",
+]
+
+[tool.setuptools]
+py-modules = ["markdown_agent"]
+
+# 接入方式（代码示例）：
+#   from thinkstack import ThinkStack
+#   stack = ThinkStack()
+#   stack.register_extension("markdown_agent", "/path/to/markdown_agent.py")
+#   stack.start()  # 应用后可通过 stack.resolve_agent("markdown-render-agent") 使用

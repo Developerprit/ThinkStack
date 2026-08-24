@@ -36,6 +36,7 @@ COMPONENT_HOOKS: frozenset[ExpandHook] = frozenset(
         ExpandHook.HOOK_CUSTOM_TOOL,
         ExpandHook.HOOK_CUSTOM_MEMORY,
         ExpandHook.HOOK_CUSTOM_SCHEDULER,
+        ExpandHook.HOOK_CUSTOM_AGENT,
     }
 )
 
@@ -58,7 +59,7 @@ def validate_hook_signature(func: Callable[..., Any], hook_point: ExpandHook) ->
     if not callable(func):
         raise ExtensionValidationError(f"钩子 {hook_point.value} 挂载的对象不可调用")
     required = _count_required_params(func)
-    if hook_point in LIFECYCLE_HOOKS and required > 1:
+    if hook_point in LIFECYCLE_HOOKS and required != 1:
         raise ExtensionValidationError(
             f"生命周期钩子 {hook_point.value} 的函数 {func.__name__!r} "
             f"签名应为 func(ctx) -> dict，但检测到 {required} 个必需参数"

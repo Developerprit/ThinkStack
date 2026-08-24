@@ -60,7 +60,8 @@ class ExtensionHandle:
         self._active = False
         self._loaded = False
         self._hooks.clear()
-        sys.modules.pop(self.module_path, None)
+        # 模块加载时以 name 为键写入 sys.modules，卸载需用 name 移除
+        sys.modules.pop(self.name, None)
         self.module = None  # type: ignore[assignment]
 
     def get_hooks(self) -> dict[str, list[Callable[..., Any]]]:

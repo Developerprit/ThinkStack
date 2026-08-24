@@ -14,6 +14,7 @@ from thinkstack import (
     ShortTermMemory,
     Task,
     ThinkStack,
+    ThinkStackError,
     Tool,
     ToolResult,
     WorkingMemory,
@@ -196,3 +197,21 @@ def test_stack_lifecycle():
     assert stack.is_running is True
     stack.shutdown()
     assert stack.is_running is False
+
+
+def test_run_agent_rejects_zero_iterations():
+    stack = ThinkStack()
+    try:
+        stack.run_agent(EchoAgent(), "x", max_iterations=0)
+        assert False, "应抛出 ThinkStackError"
+    except ThinkStackError as exc:
+        assert "max_iterations" in str(exc)
+
+
+def test_run_agent_rejects_non_int_iterations():
+    stack = ThinkStack()
+    try:
+        stack.run_agent(EchoAgent(), "x", max_iterations="3")
+        assert False, "应抛出 ThinkStackError"
+    except ThinkStackError as exc:
+        assert "max_iterations" in str(exc)

@@ -13,10 +13,11 @@ ThinkStack opens every Agent component (core, tools, memory, scheduler, protocol
 
 - **四层架构 / Four-layer architecture**：Core Layer（核心逻辑）、Expand API Layer（扩展接口）、Extension Layer（扩展实现）、Runtime Layer（运行时加载）。
 - **模型无关 / Model-agnostic**：不绑定任何 AI 模型 SDK，`think()` 只依赖可插拔的推理后端抽象。
-- **统一扩展 API / Unified Expand API**：`@expand_hook` 装饰器 + `register_extension()`，九个扩展点覆盖完整生命周期。
+- **统一扩展 API / Unified Expand API**：`@expand_hook` 装饰器 + `register_extension()`，十个扩展点覆盖完整生命周期。
+- **Markdown 渲染 / Markdown rendering**：内置纯标准库的 `markdown_to_html()`，把 LLM 输出的 Markdown 一键转 HTML，附 `markdown` 工具、`MarkdownAgent` 与 REST 端点。
 - **安全隔离 / Sandbox isolation**：扩展加载/执行异常被隔离，单扩展失败不影响框架与其他扩展。
-- **内置运行时 / Built-in runtime**：9635 端口提供 REST API，`webrun <port>` 命令动态开启浅/深色 Web 控制台。
-- **完整测试 / Full test suite**：28 个单元测试覆盖核心与扩展机制。
+- **内置运行时 / Built-in runtime**：9635 端口提供 REST API（含 SSE 流式、记忆 CRUD、扩展生命周期管理），`webrun <port>` 命令动态开启浅/深色 Web 控制台，`python -m thinkstack` 提供 CLI/REPL。
+- **完整测试 / Full test suite**：44 个单元测试覆盖核心与扩展机制。
 
 ---
 
@@ -72,6 +73,21 @@ curl -X POST http://localhost:9635/api/tools/call \
 curl -X POST http://localhost:9635/api/command \
   -H "Content-Type: application/json" \
   -d '{"command":"webrun 8080"}'
+
+# Markdown 转 HTML / render markdown to HTML
+curl -X POST http://localhost:9635/api/markdown/render \
+  -H "Content-Type: application/json" \
+  -d '{"text":"# 标题\n\n**加粗**"}'
+
+# 读写记忆 / read & write memory
+curl -X POST http://localhost:9635/api/memory \
+  -H "Content-Type: application/json" \
+  -d '{"action":"store","kind":"working","key":"user","value":{"name":"陌老师"}}'
+
+# 流式运行 Agent（SSE）/ stream an agent
+curl -X POST http://localhost:9635/api/agent/run/stream \
+  -H "Content-Type: application/json" \
+  -d '{"agent":"echo","input":"你好","max_iterations":3}'
 ```
 
 然后访问 `http://localhost:8080/` 查看可切换浅色/深色的 Web 控制台。
@@ -160,7 +176,34 @@ After registration, retrieve it from `stack.custom_schedulers`.
 
 ---
 
-## 九个扩展点 / Nine Extension Hooks
+## Markdown 渲染 / Markdown Rendering
+
+LLM 输出多为 Markdown。ThinkStack 内置纯标准库的 `markdown_to_html()`，支持标题、加粗/斜体/删除线、行内代码、围栏代码块、链接、图片、列表、引用、表格、分隔线等常见语法。
+
+```python
+from thinkstack import markdown_to_html
+
+html = markdown_to_html("# 标题\n\n**加粗** 和 `代码`")
+# <h1>标题</h1><p><strong>加粗</strong> 和 <code>代码</code></p>
+```
+
+- 内置工具：`stack.call_tool("markdown", text="...")`
+- 内置 Agent：`stack.run_agent(MarkdownAgent(), "# Hi")`
+- REST 端点：`POST /api/markdown/render`
+
+## CLI / 命令行
+
+```bash
+python -m thinkstack             # 启动 9635 端口 REST API
+python -m thinkstack --port 9000 # 指定端口
+python -m thinkstack --repl      # 交互式 REPL（无需 HTTP）
+```
+
+REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k=v ...`、`help`、`exit`。
+
+---
+
+## 十个扩展点 / Ten Extension Hooks
 
 | 扩展点 / Hook | 说明 / Purpose |
 | --- | --- |
@@ -170,6 +213,7 @@ After registration, retrieve it from `stack.custom_schedulers`.
 | `HOOK_CUSTOM_TOOL` | 注册自定义工具 / register a tool |
 | `HOOK_CUSTOM_MEMORY` | 注册自定义记忆 / register a memory |
 | `HOOK_CUSTOM_SCHEDULER` | 注册自定义调度器 / register a scheduler |
+| `HOOK_CUSTOM_AGENT` | 注册自定义 Agent / register an agent |
 
 ---
 

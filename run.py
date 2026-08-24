@@ -24,6 +24,7 @@ _EXAMPLE_EXTENSIONS = [
     ("weather", os.path.join("weather_tool", "weather.py")),
     ("sqlite_memory", os.path.join("sqlite_memory", "sqlite_memory.py")),
     ("round_robin", os.path.join("round_robin_scheduler", "round_robin.py")),
+    ("markdown_agent", os.path.join("markdown_agent", "markdown_agent.py")),
 ]
 
 

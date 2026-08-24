@@ -29,6 +29,11 @@ ThinkStack(config: Optional[Config] = None)
 | `register_extension` | `register_extension(name, module_path) -> ExtensionHandle` | 加载并注册扩展 |
 | `submit_task` | `submit_task(task: Task) -> None` | 提交调度任务 |
 | `run_tasks` | `run_tasks() -> list[TaskResult]` | 执行调度任务 |
+| `register_agent` | `register_agent(name, agent) -> None` | 注册自定义 Agent（实例或子类） |
+| `resolve_agent` | `resolve_agent(name) -> Optional[Agent]` | 按名称解析 Agent 实例 |
+| `list_agents` | `list_agents() -> list[str]` | 列出自定义 Agent 名称 |
+| `run_agent_stream` | `run_agent_stream(agent, task_input, max_iterations=None) -> Iterator[dict]` | 流式执行 Agent 循环（供 SSE） |
+| `get_memory` | `get_memory(kind) -> Memory` | 按类别获取记忆后端（long/short/working） |
 
 **属性**：`config`、`tools`、`short_term_memory`、`working_memory`、`long_term_memory`、`scheduler`、`custom_schedulers`、`is_running`。
 
@@ -108,6 +113,15 @@ Agent(name: Optional[str] = None, reasoner: Optional[Reasoner] = None)
 stack.run_agent(ToolCallingAgent(), "tool:weather city=北京", max_iterations=1)
 ```
 
+### `class MarkdownAgent(Agent)`
+
+Markdown 渲染 Agent：把输入的 Markdown 文本渲染为 HTML（面向 LLM 输出多为 Markdown 的场景）。
+
+```python
+res = stack.run_agent(MarkdownAgent(), "# 你好", max_iterations=1)
+print(res.output["html"])  # <h1>你好</h1>
+```
+
 ---
 
 ## 4. 工具
@@ -157,6 +171,17 @@ def add(a: int, b: int) -> int:
     return a + b
 ```
 
+### `markdown_to_html(text: str) -> str`
+
+把 Markdown 文本转换为 HTML 片段（纯标准库，无第三方依赖）。支持标题、加粗/斜体/删除线、行内代码、围栏代码块、链接、图片、列表、引用、表格、分隔线。
+
+```python
+from thinkstack import markdown_to_html
+
+html = markdown_to_html("**加粗** 和 `代码`")
+# <p><strong>加粗</strong> 和 <code>代码</code></p>
+```
+
 ---
 
 ## 5. 记忆
@@ -180,6 +205,19 @@ def add(a: int, b: int) -> int:
 ### `class InMemoryLongTermMemory(LongTermMemory)`
 
 长期记忆内存实现，默认占位后端。
+
+### `class JsonFileLongTermMemory(LongTermMemory)`
+
+JSON 文件持久化的长期记忆后端。`JsonFileLongTermMemory(path="thinkstack_memory.json")`，
+`save()` 原子写入（临时文件 + `os.replace`）。可通过配置启用：
+
+```python
+from thinkstack import Config, ThinkStack
+
+stack = ThinkStack(Config.from_dict({"memory": {"long_term_backend": "json_file", "persist_path": "mem.json"}}))
+stack.store_long_term("user", {"name": "陌老师"})
+stack.long_term_memory.save()
+```
 
 ```python
 stack.store_short_term("k", "v")
@@ -241,7 +279,7 @@ print(stack.run_tasks()[0].data)  # 42
 
 ### `enum ExpandHook(str, Enum)`
 
-九个扩展点：`HOOK_BEFORE_THINK`、`HOOK_AFTER_THINK`、`HOOK_BEFORE_ACTION`、`HOOK_AFTER_ACTION`、`HOOK_BEFORE_OBSERVE`、`HOOK_AFTER_OBSERVE`、`HOOK_CUSTOM_TOOL`、`HOOK_CUSTOM_MEMORY`、`HOOK_CUSTOM_SCHEDULER`。
+十个扩展点：`HOOK_BEFORE_THINK`、`HOOK_AFTER_THINK`、`HOOK_BEFORE_ACTION`、`HOOK_AFTER_ACTION`、`HOOK_BEFORE_OBSERVE`、`HOOK_AFTER_OBSERVE`、`HOOK_CUSTOM_TOOL`、`HOOK_CUSTOM_MEMORY`、`HOOK_CUSTOM_SCHEDULER`、`HOOK_CUSTOM_AGENT`。
 
 ### `expand_hook(hook_point: ExpandHook) -> Callable`
 
@@ -250,6 +288,13 @@ print(stack.run_tasks()[0].data)  # 42
 ### `register_extension(name: str, module_path: str) -> ExtensionHandle`
 
 动态加载扩展并返回句柄（使用模块级默认注册表）。
+
+> 注意：模块级 `register_extension()` 与 `stack.register_extension()` 使用**两套独立注册表**。
+> 前者仅写入全局默认注册表（供独立场景），后者才把扩展挂到具体 `ThinkStack` 实例。
+> 要让扩展真正生效（如注册工具/记忆/调度器/Agent），请使用 `stack.register_extension()`。
+
+> 安全边界：Python 无法在运行时真正强制「扩展禁止访问私有成员」。框架约定扩展仅依赖公开 API，
+> `ExtensionAccessError` 保留用于需要显式抛出的场景；对 `_private` 成员的访问属于「约定而非强制」。
 
 ### `class ExtensionHandle`
 
@@ -291,11 +336,19 @@ REST 端点：
 | GET | `/api/health` | 健康检查 |
 | GET | `/api/info` | 框架信息 |
 | GET | `/api/tools` | 工具列表 |
-| POST | `/api/tools/call` | 调用工具 |
+| POST | `/api/tools/call` | 调用工具（同步） |
+| POST | `/api/tools/acall` | 调用工具（异步） |
 | GET | `/api/extensions` | 扩展列表 |
 | POST | `/api/extensions/register` | 注册扩展 |
+| POST | `/api/extensions/{name}/disable` | 停用扩展 |
+| POST | `/api/extensions/{name}/enable` | 激活扩展 |
+| POST | `/api/extensions/{name}/unload` | 卸载扩展 |
+| GET | `/api/agents` | 内置与自定义 Agent 列表 |
 | GET | `/api/memory` | 记忆信息 |
+| POST | `/api/memory` | 记忆读写（`action: store/retrieve/clear`，`kind: long/short/working`） |
+| POST | `/api/markdown/render` | Markdown 转 HTML |
 | POST | `/api/agent/run` | 运行 Agent |
+| POST | `/api/agent/run/stream` | 流式运行 Agent（SSE） |
 | POST | `/api/tasks/run` | 执行调度任务 |
 | POST | `/api/command` | 命令通道（`webrun <port>` / `help`） |
 
@@ -310,7 +363,6 @@ WebConsole(stack: ThinkStack, host="0.0.0.0", port=8080)
 ---
 
 ## 10. 异常体系
-
 | 异常 | 继承 | 触发场景 |
 | --- | --- | --- |
 | `ThinkStackError` | `Exception` | 基类 |

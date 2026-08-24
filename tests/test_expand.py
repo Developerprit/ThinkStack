@@ -238,3 +238,60 @@ def test_round_robin_extension():
     by_name = {r.name: r.data for r in results}
     assert by_name["A"] == ["a1", "a2", "a3"]
     assert by_name["B"] == ["b1", "b2", "b3"]
+
+
+# ---------------------------------------------------------------- 修复回归：签名校验 / 异常隔离 / 幂等
+
+ZERO_ARG_HOOK_EXT = '''\
+from thinkstack import expand_hook, ExpandHook
+
+@expand_hook(ExpandHook.HOOK_BEFORE_THINK)
+def zero_arg_hook():
+    return {}
+'''
+
+
+def test_zero_arg_lifecycle_hook_rejected(tmp_path):
+    ext = tmp_path / "zero_arg_ext.py"
+    ext.write_text(ZERO_ARG_HOOK_EXT, encoding="utf-8")
+    registry = ExtensionRegistry()
+    try:
+        registry.register("zero_arg_ext", str(ext))
+        assert False, "应抛出 ExtensionValidationError"
+    except ExtensionValidationError:
+        pass
+
+
+def test_round_robin_exception_isolation():
+    stack = ThinkStack()
+    stack.register_extension("round_robin", ROUND_ROBIN_PATH)
+    stack.start()
+    sched = stack.custom_schedulers[0]
+
+    def bad_gen():
+        yield "ok1"
+        raise RuntimeError("中途崩溃")
+
+    def good_gen():
+        yield "g1"
+        yield "g2"
+
+    sched.submit(Task(name="bad", func=bad_gen))
+    sched.submit(Task(name="good", func=good_gen))
+    results = sched.run_all()
+
+    by_name = {r.name: r for r in results}
+    assert by_name["bad"].success is False
+    assert by_name["bad"].error is not None
+    assert by_name["good"].success is True
+    assert by_name["good"].data == ["g1", "g2"]
+
+
+def test_apply_extensions_scheduler_idempotent():
+    stack = ThinkStack()
+    stack.register_extension("round_robin", ROUND_ROBIN_PATH)
+    stack.start()
+    assert len(stack.custom_schedulers) == 1
+    # start() 后再次注册扩展会重新应用组件扩展，调度器不应重复累积
+    stack.register_extension("weather", WEATHER_PATH)
+    assert len(stack.custom_schedulers) == 1

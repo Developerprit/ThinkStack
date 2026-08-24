@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
 
 from thinkstack.core.stack import ThinkStack
+from thinkstack.core.markdown import markdown_to_html
 from thinkstack.core.tool import ToolResult
 from thinkstack.runtime.server import BUILTIN_AGENTS
 
@@ -94,6 +95,10 @@ class WebConsole:
                         data.get("name", ""), **(data.get("args", {}) or {})
                     )
                     return self._send_json(200, result.model_dump())
+                if path == "/api/markdown/render":
+                    data = self._read_json()
+                    text = data.get("text", "") if isinstance(data, dict) else str(data)
+                    return self._send_json(200, {"html": markdown_to_html(text)})
                 self._send_json(404, {"error": "未找到"})
 
             def _info(self) -> dict[str, Any]:

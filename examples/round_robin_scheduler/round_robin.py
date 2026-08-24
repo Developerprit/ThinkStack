@@ -64,6 +64,17 @@ class RoundRobinScheduler(Scheduler):
                     results.append(
                         TaskResult(name=item["name"], success=True, data=item["collected"])
                     )
+                except Exception as exc:
+                    # 单任务中途异常被隔离，不影响其他任务与整体流程
+                    item["done"] = True
+                    results.append(
+                        TaskResult(
+                            name=item["name"],
+                            success=False,
+                            data=item["collected"] or None,
+                            error=str(exc),
+                        )
+                    )
 
         return results
 

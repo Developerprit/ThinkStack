@@ -1,11 +1,11 @@
 """ThinkStack —— 一个「一切皆为可编写的扩展」的 Python 3 Agent 框架。
 
 公开接口：ThinkStack, Config, Agent, AgentResult, EchoAgent, ToolCallingAgent,
-Tool, ToolResult, FunctionTool, ToolRegistry, tool, Memory, ShortTermMemory,
-LongTermMemory, InMemoryLongTermMemory, WorkingMemory, Scheduler,
-SerialScheduler, ParallelScheduler, PriorityScheduler, Task, TaskResult,
-Reasoner, EchoReasoner, ExpandHook, expand_hook, register_extension,
-ExtensionHandle, ExtensionRegistry, ThinkStackServer, WebConsole,
+MarkdownAgent, Tool, ToolResult, FunctionTool, ToolRegistry, tool, Memory,
+ShortTermMemory, LongTermMemory, InMemoryLongTermMemory, JsonFileLongTermMemory,
+WorkingMemory, Scheduler, SerialScheduler, ParallelScheduler, PriorityScheduler,
+Task, TaskResult, Reasoner, EchoReasoner, markdown_to_html, ExpandHook, expand_hook,
+register_extension, ExtensionHandle, ExtensionRegistry, ThinkStackServer, WebConsole,
 以及 ThinkStackError 异常体系。
 """
 
@@ -18,7 +18,9 @@ from thinkstack.core import (
     EmptyInput,
     FunctionTool,
     InMemoryLongTermMemory,
+    JsonFileLongTermMemory,
     LongTermMemory,
+    MarkdownAgent,
     Memory,
     ParallelScheduler,
     PriorityScheduler,
@@ -34,6 +36,9 @@ from thinkstack.core import (
     ToolRegistry,
     ToolResult,
     WorkingMemory,
+    iter_agent_loop,
+    markdown_to_html,
+    run_agent_loop,
     tool,
 )
 from thinkstack.errors import (
@@ -57,15 +62,18 @@ from thinkstack.expand import (
 )
 from thinkstack.runtime import ThinkStackServer, WebConsole
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 __all__ = [
     "ThinkStack",
     "Config",
     "Agent",
     "AgentResult",
+    "run_agent_loop",
+    "iter_agent_loop",
     "EchoAgent",
     "ToolCallingAgent",
+    "MarkdownAgent",
     "Tool",
     "ToolResult",
     "FunctionTool",
@@ -76,6 +84,7 @@ __all__ = [
     "ShortTermMemory",
     "LongTermMemory",
     "InMemoryLongTermMemory",
+    "JsonFileLongTermMemory",
     "WorkingMemory",
     "Scheduler",
     "SerialScheduler",
@@ -85,6 +94,7 @@ __all__ = [
     "TaskResult",
     "Reasoner",
     "EchoReasoner",
+    "markdown_to_html",
     "ExpandHook",
     "expand_hook",
     "register_extension",

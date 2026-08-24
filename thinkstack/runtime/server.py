@@ -5,19 +5,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Optional
+from urllib.parse import urlparse
 
-from thinkstack.core.agents import EchoAgent, ToolCallingAgent
+from thinkstack.core.agents import EchoAgent, MarkdownAgent, ToolCallingAgent
+from thinkstack.core.markdown import markdown_to_html
 from thinkstack.core.stack import ThinkStack
 from thinkstack.core.tool import ToolResult
 
-# 内置 Agent 名称映射（供 /api/agent/run 选择）
+# 内置 Agent 名称映射（供 /api/agent/run 选择，自定义 Agent 通过 stack.custom_agents 扩展）
 BUILTIN_AGENTS: dict[str, type] = {
     "echo": EchoAgent,
     "tool-calling": ToolCallingAgent,
+    "markdown": MarkdownAgent,
 }
 
 
@@ -43,7 +47,7 @@ class ThinkStackServer:
         stack = self.stack
 
         class Handler(BaseHTTPRequestHandler):
-            server_version = "ThinkStack/1.0"
+            server_version = "ThinkStack/1.1"
 
             def _send(self, status: int, payload: Any) -> None:
                 body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -79,9 +83,13 @@ class ThinkStackServer:
             def do_POST(self) -> None:
                 self._route("POST")
 
-            def _route(self, method: str) -> None:
-                from urllib.parse import urlparse
+            def _resolve_agent(self, key: str):
+                cls = BUILTIN_AGENTS.get(key)
+                if cls is not None:
+                    return cls()
+                return stack.resolve_agent(key)
 
+            def _route(self, method: str) -> None:
                 path = urlparse(self.path).path
                 try:
                     if method == "GET" and path == "/api/health":
@@ -92,20 +100,37 @@ class ThinkStackServer:
                         return self._send(200, {"tools": stack.list_tools()})
                     if method == "POST" and path == "/api/tools/call":
                         return self._handle_tool_call()
+                    if method == "POST" and path == "/api/tools/acall":
+                        return self._handle_tool_acall()
                     if method == "GET" and path == "/api/extensions":
                         return self._send(200, server._extensions_info())
                     if method == "POST" and path == "/api/extensions/register":
                         return self._handle_extension_register()
+                    if method == "GET" and path == "/api/agents":
+                        return self._send(200, server._agents_info())
                     if method == "GET" and path == "/api/memory":
                         return self._send(200, server._memory_info())
+                    if method == "POST" and path == "/api/memory":
+                        return self._handle_memory()
+                    if method == "POST" and path == "/api/markdown/render":
+                        return self._handle_markdown_render()
                     if method == "POST" and path == "/api/agent/run":
                         return self._handle_agent_run()
+                    if method == "POST" and path == "/api/agent/run/stream":
+                        return self._handle_agent_run_stream()
                     if method == "POST" and path == "/api/tasks/run":
                         return self._handle_tasks_run()
                     if method == "POST" and path == "/api/command":
                         return self._handle_command()
+
+                    # 扩展生命周期：/api/extensions/{name}/{disable|enable|unload}
+                    ext_m = _match_extension_action(path)
+                    if method == "POST" and ext_m:
+                        return self._handle_extension_action(*ext_m)
+
                     return self._send(404, {"error": "未找到该端点", "path": path})
                 except Exception as exc:  # 兜底：任何内部异常转 JSON 错误
+                    stack.logger.warning("请求处理异常：%s", exc)
                     return self._send(500, {"error": str(exc)})
 
             def _handle_tool_call(self) -> None:
@@ -115,6 +140,13 @@ class ThinkStackServer:
                 result: ToolResult = stack.call_tool(name, **args)
                 self._send(200, result.model_dump())
 
+            def _handle_tool_acall(self) -> None:
+                data = self._read_json() or {}
+                name = data.get("name", "")
+                args = data.get("args", {}) or {}
+                result: ToolResult = asyncio.run(stack.acall_tool(name, **args))
+                self._send(200, result.model_dump())
+
             def _handle_extension_register(self) -> None:
                 data = self._read_json() or {}
                 name = data.get("name", "")
@@ -122,17 +154,87 @@ class ThinkStackServer:
                 handle = stack.register_extension(name, module_path)
                 self._send(200, {"name": handle.name, "is_active": handle.is_active})
 
+            def _handle_extension_action(self, name: str, action: str) -> None:
+                try:
+                    handle = stack.get_extension(name)
+                except Exception as exc:
+                    return self._send(404, {"error": str(exc)})
+                if action == "disable":
+                    handle.disable()
+                elif action == "enable":
+                    handle.enable()
+                elif action == "unload":
+                    stack._registry.unload(name)
+                else:
+                    return self._send(400, {"error": f"未知扩展操作 {action!r}"})
+                self._send(200, {"name": name, "is_active": handle.is_active})
+
+            def _handle_memory(self) -> None:
+                data = self._read_json() or {}
+                action = data.get("action", "retrieve")
+                kind = data.get("kind", "working")
+                key = data.get("key", "")
+                try:
+                    mem = stack.get_memory(kind)
+                except Exception as exc:
+                    return self._send(400, {"error": str(exc)})
+                if action == "store":
+                    mem.store(key, data.get("value"))
+                    return self._send(200, {"ok": True, "action": "store", "kind": kind, "key": key})
+                if action == "retrieve":
+                    value = mem.retrieve(key)
+                    return self._send(200, {"ok": True, "action": "retrieve", "value": value})
+                if action == "clear":
+                    mem.clear()
+                    return self._send(200, {"ok": True, "action": "clear", "kind": kind})
+                return self._send(400, {"error": f"未知记忆操作 {action!r}"})
+
+            def _handle_markdown_render(self) -> None:
+                data = self._read_json()
+                if data is None:
+                    return self._send(400, {"error": "请求体不是合法 JSON"})
+                text = data.get("text", "") if isinstance(data, dict) else str(data)
+                return self._send(200, {"html": markdown_to_html(text)})
+
             def _handle_agent_run(self) -> None:
                 data = self._read_json() or {}
                 agent_key = data.get("agent", "echo")
                 task_input = data.get("input", "")
                 max_iterations = data.get("max_iterations")
-                agent_cls = BUILTIN_AGENTS.get(agent_key)
-                if agent_cls is None:
+                agent = self._resolve_agent(agent_key)
+                if agent is None:
                     return self._send(400, {"error": f"未知 agent：{agent_key!r}"})
-                agent = agent_cls()
                 result = stack.run_agent(agent, task_input, max_iterations)
                 self._send(200, result.model_dump())
+
+            def _handle_agent_run_stream(self) -> None:
+                data = self._read_json() or {}
+                agent_key = data.get("agent", "echo")
+                task_input = data.get("input", "")
+                max_iterations = data.get("max_iterations")
+                agent = self._resolve_agent(agent_key)
+                if agent is None:
+                    return self._send(400, {"error": f"未知 agent：{agent_key!r}"})
+
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                try:
+                    for step in stack.run_agent_stream(agent, task_input, max_iterations):
+                        payload = json.dumps(step, ensure_ascii=False, default=str)
+                        self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                        self.wfile.flush()
+                    self.wfile.write(b"event: done\ndata: {}\n\n")
+                    self.wfile.flush()
+                except Exception as exc:
+                    try:
+                        err = json.dumps({"error": str(exc)}, ensure_ascii=False)
+                        self.wfile.write(f"event: error\ndata: {err}\n\n".encode("utf-8"))
+                        self.wfile.flush()
+                    except Exception:
+                        pass
 
             def _handle_tasks_run(self) -> None:
                 results = stack.run_tasks()
@@ -248,6 +350,7 @@ class ThinkStackServer:
             "scheduler": self.stack.config.scheduler.strategy,
             "tool_count": len(self.stack.list_tools()),
             "extension_count": len(self.stack.list_extensions()),
+            "agent_count": len(self.stack.list_agents()),
         }
 
     def _extensions_info(self) -> dict[str, Any]:
@@ -256,6 +359,12 @@ class ThinkStackServer:
                 {"name": h.name, "is_active": h.is_active, "hooks": h.hook_points}
                 for h in self.stack.list_extensions()
             ]
+        }
+
+    def _agents_info(self) -> dict[str, Any]:
+        return {
+            "builtin": list(BUILTIN_AGENTS.keys()),
+            "custom": self.stack.list_agents(),
         }
 
     def _memory_info(self) -> dict[str, Any]:
@@ -267,3 +376,20 @@ class ThinkStackServer:
             "working": {"size": len(self.stack.working_memory.snapshot())},
             "long_term_backend": type(self.stack.long_term_memory).__name__,
         }
+
+
+def _match_extension_action(path: str) -> Optional[tuple[str, str]]:
+    """匹配 /api/extensions/{name}/{action}，返回 (name, action) 或 None。"""
+    prefix = "/api/extensions/"
+    if not path.startswith(prefix):
+        return None
+    rest = path[len(prefix):]
+    parts = rest.split("/")
+    if len(parts) != 2:
+        return None
+    name, action = parts
+    if action not in ("disable", "enable", "unload"):
+        return None
+    if not name:
+        return None
+    return name, action

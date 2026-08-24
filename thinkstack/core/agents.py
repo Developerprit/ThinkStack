@@ -1,14 +1,14 @@
 """内置示例 Agent 实现。
 
-公开接口：EchoAgent, ToolCallingAgent
+公开接口：EchoAgent, ToolCallingAgent, MarkdownAgent
 """
 
 from __future__ import annotations
 
 from typing import Any, Optional
 
-from thinkstack.core.agent import Agent, AgentResult
-from thinkstack.core.reasoner import Reasoner
+from thinkstack.core.agent import Agent
+from thinkstack.core.markdown import markdown_to_html
 
 
 class EchoAgent(Agent):
@@ -68,3 +68,23 @@ class ToolCallingAgent(Agent):
                 kwargs[key] = value
         result = stack.call_tool(tool_name, **kwargs)
         return {"result": result.model_dump()}
+
+
+class MarkdownAgent(Agent):
+    """Markdown 渲染 Agent：把输入的 Markdown 文本渲染为 HTML。
+
+    面向 LLM 输出多为 Markdown 的场景，think 透传输入，
+    observe 使用内置 markdown_to_html 转换后返回 HTML。
+    """
+
+    name = "markdown-agent"
+
+    def think(self, context: dict[str, Any]) -> str:
+        return str(context.get("input", ""))
+
+    def act(self, thought: str) -> Any:
+        return thought
+
+    def observe(self, action: Any) -> Any:
+        source = str(action)
+        return {"markdown": source, "html": markdown_to_html(source)}

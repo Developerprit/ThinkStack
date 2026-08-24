@@ -118,6 +118,7 @@ pre { background: var(--surface-2); border: 1px solid var(--border); border-radi
       <select id="agentSelect">
         <option value="echo">echo（回显）</option>
         <option value="tool-calling">tool-calling（工具调用）</option>
+        <option value="markdown">markdown（MD→HTML）</option>
       </select>
       <input id="maxIter" type="number" value="5" min="1" style="width:90px" title="最大迭代次数" />
       <button class="primary" id="runAgentBtn">运行</button>
@@ -135,10 +136,34 @@ pre { background: var(--surface-2); border: 1px solid var(--border); border-radi
     </div>
     <pre id="toolOutput" class="muted">工具调用结果将显示在这里…</pre>
   </section>
+
+  <section class="panel">
+    <h2>Markdown 渲染（MD → HTML）</h2>
+    <div class="row">
+      <button class="primary" id="renderMdBtn">渲染</button>
+      <button id="renderMdPreviewBtn">预览</button>
+    </div>
+    <textarea id="mdInput" placeholder="输入 Markdown，例如：# 标题&#10;&#10;**加粗** 和 *斜体* 与 `行内代码`"># 你好 ThinkStack
+
+这是 **Markdown**，会自动转成 HTML。
+
+- 列表项一
+- 列表项二
+
+`行内代码` 与代码块：
+
+```
+print("hello")
+```</textarea>
+    <pre id="mdOutput" class="muted">渲染后的 HTML 将显示在这里…</pre>
+  </section>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 const api = async (path, opts) => {
   const res = await fetch(path, opts);
   return res.json();
@@ -187,7 +212,7 @@ async function refreshTools() {
     return;
   }
   box.innerHTML = "<table><tr><th>名称</th><th>说明</th><th>类型</th></tr>" +
-    tools.map(t => `<tr><td>${t.name}</td><td>${t.description || "—"}</td>
+    tools.map(t => `<tr><td>${esc(t.name)}</td><td>${esc(t.description) || "—"}</td>
       <td><span class="badge">${t.is_async ? "异步" : "同步"}</span></td></tr>`).join("") +
     "</table>";
   for (const t of tools) {
@@ -208,9 +233,9 @@ async function refreshExtensions() {
   }
   box.innerHTML = exts.map(e => `
     <div style="padding:6px 0;border-bottom:1px solid var(--border)">
-      <strong>${e.name}</strong>
+      <strong>${esc(e.name)}</strong>
       <span class="badge ${e.is_active ? "on" : "off"}">${e.is_active ? "启用" : "停用"}</span>
-      <div>${(e.hooks || []).map(h => `<span class="chip">${h}</span>`).join("")}</div>
+      <div>${(e.hooks || []).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
     </div>`).join("");
 }
 
@@ -241,6 +266,23 @@ $("callToolBtn").addEventListener("click", async () => {
   });
   out.textContent = JSON.stringify(res, null, 2);
 });
+
+async function renderMarkdown(showPreview) {
+  const out = $("mdOutput");
+  const text = $("mdInput").value;
+  const res = await api("/api/markdown/render", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (showPreview && res.html) {
+    out.textContent = "";
+    out.innerHTML = res.html;
+  } else {
+    out.textContent = JSON.stringify(res, null, 2);
+  }
+}
+$("renderMdBtn").addEventListener("click", () => renderMarkdown(false));
+$("renderMdPreviewBtn").addEventListener("click", () => renderMarkdown(true));
 
 initTheme();
 refreshInfo();

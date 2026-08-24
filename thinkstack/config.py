@@ -1,21 +1,25 @@
 """ThinkStack 统一配置入口。
 
-公开接口：Config, MemoryConfig, SchedulerConfig, ServerConfig
+公开接口：Config, MemoryConfig, SchedulerConfig, ServerConfig, LogConfig
 """
 
 from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
+
+from thinkstack.errors import ConfigError
 
 
 class MemoryConfig(BaseModel):
     """记忆子系统配置。"""
 
     short_term_capacity: int = Field(default=100, ge=1, description="短期记忆最大条数")
-    long_term_backend: str = Field(default="in_memory", description="长期记忆后端名称")
-    persist_path: str = Field(default="", description="长期记忆持久化路径（可选）")
+    long_term_backend: Literal["in_memory", "json_file"] = Field(
+        default="in_memory", description="长期记忆后端：in_memory / json_file"
+    )
+    persist_path: str = Field(default="", description="长期记忆持久化路径（json_file 后端使用）")
 
 
 class SchedulerConfig(BaseModel):
@@ -37,6 +41,15 @@ class ServerConfig(BaseModel):
     )
 
 
+class LogConfig(BaseModel):
+    """日志配置。"""
+
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO", description="日志级别"
+    )
+    file: str = Field(default="", description="日志文件路径（为空则仅输出到控制台）")
+
+
 class Config(BaseModel):
     """ThinkStack 顶层配置数据类。
 
@@ -51,8 +64,12 @@ class Config(BaseModel):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     scheduler: SchedulerConfig = Field(default_factory=SchedulerConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+    log: LogConfig = Field(default_factory=LogConfig)
 
     @classmethod
     def from_dict(cls, data: dict) -> "Config":
-        """从字典构造配置对象，非法字段将抛 ConfigError 语义的校验异常。"""
-        return cls.model_validate(data)
+        """从字典构造配置对象，非法字段将抛 ConfigError。"""
+        try:
+            return cls.model_validate(data)
+        except ValidationError as exc:
+            raise ConfigError(f"配置校验失败：{exc}") from exc

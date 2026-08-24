@@ -24,3 +24,4 @@ class ExpandHook(str, Enum):
     HOOK_CUSTOM_TOOL = "hook_custom_tool"
     HOOK_CUSTOM_MEMORY = "hook_custom_memory"
     HOOK_CUSTOM_SCHEDULER = "hook_custom_scheduler"
+    HOOK_CUSTOM_AGENT = "hook_custom_agent"

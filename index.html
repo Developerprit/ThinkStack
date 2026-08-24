@@ -265,9 +265,9 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
         <a class="btn btn-ghost" href="#architecture">了解架构</a>
       </div>
       <div class="hero-stats">
-        <div class="stat"><div class="num">9</div><div class="lbl">扩展点 Hooks</div></div>
+        <div class="stat"><div class="num">10</div><div class="lbl">扩展点 Hooks</div></div>
         <div class="stat"><div class="num">4</div><div class="lbl">层架构 Layers</div></div>
-        <div class="stat"><div class="num">28</div><div class="lbl">单元测试 Tests</div></div>
+        <div class="stat"><div class="num">44</div><div class="lbl">单元测试 Tests</div></div>
       </div>
     </div>
     <div class="terminal">
@@ -315,13 +315,13 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
       <div class="idx">/03</div>
       <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></div>
       <h3>统一 Expand API</h3>
-      <p>@expand_hook 装饰器 + register_extension，九个扩展点覆盖完整生命周期。</p>
+      <p>@expand_hook 装饰器 + register_extension，十个扩展点覆盖完整生命周期。</p>
     </div>
     <div class="feature">
       <div class="idx">/04</div>
       <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
       <h3>安全隔离</h3>
-      <p>扩展加载与执行异常被隔离，单扩展失败不影响框架与其他扩展，越权访问被拦截。</p>
+      <p>扩展加载与执行异常被隔离，单扩展失败不影响框架与其他扩展，签名校验拦截非法钩子。</p>
     </div>
     <div class="feature">
       <div class="idx">/05</div>
@@ -371,7 +371,7 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
 <section id="hooks">
   <div class="sec-head">
     <div class="sec-tag">// 03 · Expand Hooks</div>
-    <h2>九个扩展点</h2>
+    <h2>十个扩展点</h2>
     <p>把函数挂到任意生命周期节点，或注册自定义组件。</p>
   </div>
   <div class="hooks">
@@ -384,6 +384,7 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
     <div class="hook"><span class="dot"></span>HOOK_CUSTOM_TOOL</div>
     <div class="hook"><span class="dot"></span>HOOK_CUSTOM_MEMORY</div>
     <div class="hook"><span class="dot"></span>HOOK_CUSTOM_SCHEDULER</div>
+    <div class="hook"><span class="dot"></span>HOOK_CUSTOM_AGENT</div>
   </div>
 </section>
 
