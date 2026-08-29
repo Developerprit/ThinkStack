@@ -1,8 +1,7 @@
 """ThinkStack 启动入口。
 
 运行本文件后将在 9635 端口启动 ThinkStack REST API 客户端，
-任何人都可接入该客户端构建属于自己的 Agent 应用。
-通过 API 命令通道下发 `webrun <port>` 可动态开启 Web 控制台。
+任何人都可接入该客户端构建属于自己的 Agent 应用（Web UI 由应用自行铺设）。
 
 用法：
     python run.py                 # 默认 0.0.0.0:9635
@@ -68,8 +67,7 @@ def main() -> None:
     print(f"  REST API : http://{args.host}:{args.port}")
     print(f"  Health   : http://localhost:{args.port}/api/health")
     print(f"  Info     : http://localhost:{args.port}/api/info")
-    print("  Open a Web console by POST /api/command with body")
-    print('  {"command": "webrun 8080"}  ->  http://localhost:8080/')
+    print(f"  Skills   : http://localhost:{args.port}/api/skills")
     print("=" * 60)
 
     try:

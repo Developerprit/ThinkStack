@@ -5,8 +5,9 @@ MarkdownAgent, Tool, ToolResult, FunctionTool, ToolRegistry, tool, Memory,
 ShortTermMemory, LongTermMemory, InMemoryLongTermMemory, JsonFileLongTermMemory,
 WorkingMemory, Scheduler, SerialScheduler, ParallelScheduler, PriorityScheduler,
 Task, TaskResult, Reasoner, EchoReasoner, markdown_to_html, ExpandHook, expand_hook,
-register_extension, ExtensionHandle, ExtensionRegistry, ThinkStackServer, WebConsole,
-ThinkStackError 异常体系，以及 TS 状态码（ts_status / TSStatusError / TS_CODE_*）。
+register_extension, ExtensionHandle, ExtensionRegistry, ThinkStackServer,
+Skill, SkillRegistry, ThinkStackError 异常体系，以及 TS 状态码
+（ts_status / TSStatusError / TS_CODE_*）。
 """
 
 from thinkstack.config import Config
@@ -28,6 +29,8 @@ from thinkstack.core import (
     Scheduler,
     SerialScheduler,
     ShortTermMemory,
+    Skill,
+    SkillRegistry,
     Task,
     TaskResult,
     ThinkStack,
@@ -50,6 +53,7 @@ from thinkstack.errors import (
     ExtensionValidationError,
     MemoryError,
     SchedulerError,
+    SkillError,
     ThinkStackError,
     ToolError,
     TS_CODE_BLACKHOLE,
@@ -74,9 +78,9 @@ from thinkstack.expand import (
     expand_hook,
     register_extension,
 )
-from thinkstack.runtime import ThinkStackServer, WebConsole
+from thinkstack.runtime import ThinkStackServer
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 __all__ = [
     "ThinkStack",
@@ -115,8 +119,9 @@ __all__ = [
     "ExtensionHandle",
     "ExtensionRegistry",
     "ExtensionLoader",
+    "Skill",
+    "SkillRegistry",
     "ThinkStackServer",
-    "WebConsole",
     "ThinkStackError",
     "ConfigError",
     "ToolError",
@@ -126,6 +131,7 @@ __all__ = [
     "ExtensionLoadError",
     "ExtensionValidationError",
     "ExtensionAccessError",
+    "SkillError",
     "TSStatusError",
     "ts_status",
     "TS_CODE_OK",

@@ -283,9 +283,9 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
         <div><span class="p">$</span> curl -X POST .../api/agent/run <span class="s">\</span></div>
         <div>  -d <span class="s">'{"agent":"echo","input":"你好"}'</span></div>
         <div><span class="k">→</span> {<span class="s">"success"</span>: true, ...}</div>
-        <div><span class="p">$</span> curl -X POST .../api/command <span class="s">\</span></div>
-        <div>  -d <span class="s">'{"command":"webrun 8080"}'</span></div>
-        <div><span class="k">→</span> Web 控制台 : http://localhost:8080</div>
+        <div><span class="p">$</span> curl .../api/skills/load <span class="s">\</span></div>
+        <div>  -d <span class="s">'{"path":"/skills/my-skill"}'</span></div>
+        <div><span class="k">→</span> {<span class="s">"ok"</span>: true, <span class="s">"name"</span>: <span class="s">"my-skill"</span>}</div>
         <div><span class="p">$</span> <span class="cursor"></span></div>
       </div>
     </div>
@@ -325,9 +325,9 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
     </div>
     <div class="feature">
       <div class="idx">/05</div>
-      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-      <h3>三种调度策略</h3>
-      <p>串行、并行、优先级队列开箱即用，也可实现自定义调度器无缝接入。</p>
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.5-6.3 4.5L8 13.8 2 9.2h7.6z"/></svg></div>
+      <h3>Agent Skill</h3>
+      <p>原生支持 agentskills.io 开放标准，SKILL.md 技能即插即用，渐进式披露自动注入 Agent 上下文。</p>
     </div>
     <div class="feature">
       <div class="idx">/06</div>
@@ -362,8 +362,8 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
     </div>
     <div class="arch-layer">
       <div class="lname">Runtime Layer<span class="ltag"> 运行时加载</span></div>
-      <div class="ldesc">HTTP REST API 与 Web 控制台，负责对外通信与扩展加载。</div>
-      <div class="lmods"><span class="m">ThinkStackServer</span><span class="m">WebConsole</span></div>
+      <div class="ldesc">JSON REST API 与 Agent Skill 加载，Web UI 由各 Agent 应用自行铺设。</div>
+      <div class="lmods"><span class="m">ThinkStackServer</span><span class="m">SkillRegistry</span></div>
     </div>
   </div>
 </section>
@@ -405,8 +405,8 @@ footer { border-top: 1px solid var(--border); padding: 40px 24px; }
       <div class="cb-head">调用 REST API</div>
       <pre>curl -X POST .../api/agent/run \
  -d '{"agent":"echo","input":"你好"}'
-curl -X POST .../api/command \
- -d '{"command":"webrun 8080"}'</pre>
+curl .../api/skills/load \
+ -d '{"path":"/skills/my-skill"}'</pre>
     </div>
     <div class="code-block">
       <div class="cb-head">用代码接入</div>

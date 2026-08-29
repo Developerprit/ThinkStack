@@ -106,7 +106,7 @@ def test_rest_architecture_check_endpoint():
         assert body["ts_status"] == "TS ok :2000"
 
         info = json.loads(urllib.request.urlopen(f"{base}/api/info").read().decode())
-        assert info["version"] == "1.2.0"
+        assert info["version"] == "1.3.0"
 
         health = json.loads(urllib.request.urlopen(f"{base}/api/health").read().decode())
         assert health["ts"] == "TS ok :2000"

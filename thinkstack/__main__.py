@@ -60,8 +60,7 @@ def run_server(args: argparse.Namespace) -> None:
     print(f"  REST API : http://{args.host}:{args.port}")
     print(f"  Health   : http://localhost:{args.port}/api/health")
     print(f"  Info     : http://localhost:{args.port}/api/info")
-    print("  Open a Web console by POST /api/command with body")
-    print('  {"command": "webrun 8080"}  ->  http://localhost:8080/')
+    print(f"  Skills   : http://localhost:{args.port}/api/skills")
     print("=" * 60)
 
     try:
@@ -99,9 +98,18 @@ def run_repl() -> None:
             print("  echo <text>          Run the echo agent")
             print("  md <markdown>        Render markdown to HTML")
             print("  tool <name> k=v ...  Call a tool (e.g. tool weather city=Beijing)")
+            print("  skills               List loaded Agent Skills")
             print("  arch                 Run the architecture self-check (TS status code)")
             print("  help                 Show this help")
             print("  exit                 Quit")
+            continue
+        if cmd == "skills":
+            loaded = stack.list_skills()
+            if not loaded:
+                print("[skills] none loaded")
+            else:
+                for s in loaded:
+                    print(f"[skills] {s['name']}: {s['description']}")
             continue
         if cmd == "arch":
             result = stack.check_architecture()

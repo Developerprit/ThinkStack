@@ -38,6 +38,7 @@ from thinkstack.core.scheduler import (
     Task,
     TaskResult,
 )
+from thinkstack.core.skills import Skill, SkillRegistry
 from thinkstack.core.tool import FunctionTool, Tool, ToolRegistry, ToolResult
 from thinkstack.errors import (
     SchedulerError,
@@ -72,10 +73,16 @@ class MarkdownInput(BaseModel):
     text: str = Field(description="要转换的 Markdown 文本")
 
 
+class SkillInput(BaseModel):
+    """skill 工具入参：按名称获取已加载 Agent Skill 的完整指令。"""
+
+    skill: str = Field(description="要获取指令内容的 Agent Skill 名称")
+
+
 class ThinkStack:
     """ThinkStack Agent 框架主入口。
 
-    聚合工具注册表、三类记忆、调度器、Agent 注册表、扩展注册表与执行循环，
+    聚合工具注册表、三类记忆、调度器、Agent 注册表、Skill 注册表、扩展注册表与执行循环，
     对外提供统一的生命周期管理（__init__ / start / shutdown）。
     """
 
@@ -92,6 +99,7 @@ class ThinkStack:
         self.scheduler: Scheduler = self._build_scheduler()
         self.custom_schedulers: list[Scheduler] = []
         self.custom_agents: dict[str, Any] = {}
+        self.skills = SkillRegistry()
 
         # 内置 markdown 工具：把 LLM 输出的 Markdown 渲染为 HTML
         self.register_tool(
@@ -100,6 +108,16 @@ class ThinkStack:
                 description="将 Markdown 文本渲染为 HTML",
                 input_schema=MarkdownInput,
                 func=lambda text: markdown_to_html(text),
+            )
+        )
+
+        # 内置 skill 工具：按名称返回已加载 Agent Skill 的完整指令（渐进式披露）
+        self.register_tool(
+            FunctionTool(
+                name="skill",
+                description="获取已加载 Agent Skill 的完整指令内容（按名称）",
+                input_schema=SkillInput,
+                func=lambda skill: self.get_skill(skill).to_markdown(),
             )
         )
 
@@ -233,6 +251,32 @@ class ThinkStack:
         """按名称获取扩展句柄。"""
         return self._registry.get(name)
 
+    # ------------------------------------------------------------------ Agent Skill
+
+    def load_skill(self, path: str) -> Skill:
+        """加载一个 Agent Skill 目录（含 SKILL.md，遵循 agentskills.io 标准）。"""
+        return self.skills.load(path)
+
+    def load_skill_dir(self, dir_path: str) -> list[Skill]:
+        """扫描目录，加载其中全部含 SKILL.md 的 skill 子目录。"""
+        return self.skills.load_dir(dir_path)
+
+    def list_skills(self) -> list[dict[str, str]]:
+        """列出全部已加载 skill 的元数据摘要（name + description）。"""
+        return self.skills.summaries()
+
+    def get_skill(self, name: str) -> Skill:
+        """按名称获取 skill，未加载则抛 SkillError。"""
+        return self.skills.get(name)
+
+    def unload_skill(self, name: str) -> None:
+        """卸载指定 skill。"""
+        self.skills.unload(name)
+
+    def skill_context(self) -> str:
+        """返回全部已加载 skill 的摘要文本（供 Agent 循环注入上下文）。"""
+        return self.skills.context()
+
     # ------------------------------------------------------------------ 架构自检
 
     def check_architecture(self) -> dict[str, Any]:
@@ -289,6 +333,7 @@ class ThinkStack:
                     ("working_memory", "working memory"),
                     ("long_term_memory", "long-term memory"),
                     ("scheduler", "scheduler"),
+                    ("skills", "skill registry"),
                 ):
                     if getattr(self, attr, None) is None:
                         core_ok, core_checks = False, [f"{label} is missing"]

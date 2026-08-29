@@ -118,6 +118,13 @@ class ExtensionAccessError(ThinkStackError):
         super().__init__(message, code="EXTENSION_ACCESS_ERROR")
 
 
+class SkillError(ThinkStackError):
+    """Agent Skill 加载、解析或校验错误。"""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, code="SKILL_ERROR")
+
+
 class TSStatusError(ThinkStackError):
     """携带 TS 状态码的框架错误。
 

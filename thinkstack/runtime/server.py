@@ -29,7 +29,7 @@ class ThinkStackServer:
     """围绕 ThinkStack 实例提供 JSON REST API 的 HTTP 服务器。
 
     默认监听 9635 端口，任何语言/HTTP 客户端均可接入。
-    支持通过命令通道 `webrun <port>` 动态开启 Web 控制台。
+    v1.3.0 起框架不再自带 Web 控制台，Web UI 由各 Agent 应用自行铺设。
     """
 
     def __init__(self, stack: ThinkStack, host: str = "0.0.0.0", port: int = 9635) -> None:
@@ -37,7 +37,6 @@ class ThinkStackServer:
         self.host = host
         self.port = port
         self._httpd: Optional[ThreadingHTTPServer] = None
-        self._consoles: dict[int, Any] = {}
 
     # ---------------------------------------------------------------- 生命周期
 
@@ -47,7 +46,7 @@ class ThinkStackServer:
         stack = self.stack
 
         class Handler(BaseHTTPRequestHandler):
-            server_version = "ThinkStack/1.2"
+            server_version = "ThinkStack/1.3"
 
             def _send(self, status: int, payload: Any) -> None:
                 body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -129,8 +128,12 @@ class ThinkStackServer:
                         return self._handle_agent_run_stream()
                     if method == "POST" and path == "/api/tasks/run":
                         return self._handle_tasks_run()
-                    if method == "POST" and path == "/api/command":
-                        return self._handle_command()
+                    if method == "GET" and path == "/api/skills":
+                        return self._send(200, server._skills_info())
+                    if method == "POST" and path == "/api/skills/load":
+                        return self._handle_skill_load()
+                    if method == "POST" and path == "/api/skills/unload":
+                        return self._handle_skill_unload()
 
                     # 扩展生命周期：/api/extensions/{name}/{disable|enable|unload}
                     ext_m = _match_extension_action(path)
@@ -249,15 +252,24 @@ class ThinkStackServer:
                 results = stack.run_tasks()
                 self._send(200, {"results": [r.model_dump() for r in results]})
 
-            def _handle_command(self) -> None:
-                data = self._read_json()
-                if data is None:
-                    return self._send(400, {"error": "请求体不是合法 JSON"})
-                if isinstance(data, str):
-                    command = data
-                else:
-                    command = str(data.get("command", ""))
-                self._send(200, server.handle_command(command))
+            def _handle_skill_load(self) -> None:
+                data = self._read_json() or {}
+                path = str(data.get("path", ""))
+                if not path:
+                    return self._send(400, {"error": "缺少 skill 路径（path）"})
+                try:
+                    skill = stack.load_skill(path)
+                except Exception as exc:
+                    return self._send(400, {"error": str(exc)})
+                self._send(200, {"ok": True, "name": skill.name, "description": skill.description})
+
+            def _handle_skill_unload(self) -> None:
+                data = self._read_json() or {}
+                name = str(data.get("name", ""))
+                if not name:
+                    return self._send(400, {"error": "缺少 skill 名称（name）"})
+                stack.unload_skill(name)
+                self._send(200, {"ok": True, "name": name, "unloaded": True})
 
             def log_message(self, format: str, *args: Any) -> None:  # 静默日志
                 pass
@@ -275,78 +287,6 @@ class ThinkStackServer:
             self._httpd.shutdown()
             self._httpd.server_close()
             self._httpd = None
-        for console in list(self._consoles.values()):
-            try:
-                console.shutdown()
-            except Exception:
-                pass
-        self._consoles.clear()
-
-    # ---------------------------------------------------------------- 命令通道
-
-    def handle_command(self, command: str) -> dict[str, Any]:
-        """处理文本命令，当前支持：
-
-        - `webrun <port>`：在指定端口开启 Web 控制台
-        - `webrun stop <port>`：停止指定端口的 Web 控制台
-        - `help`：查看可用命令
-        """
-        text = (command or "").strip()
-        if not text:
-            return {"ok": False, "error": "空命令"}
-
-        parts = text.split()
-        head = parts[0].lower()
-
-        if head == "help":
-            return {
-                "ok": True,
-                "commands": [
-                    "webrun <port>       在指定端口开启 Web 控制台",
-                    "webrun stop <port>  停止指定端口的 Web 控制台",
-                    "help               查看可用命令",
-                ],
-            }
-
-        if head == "webrun":
-            if len(parts) >= 3 and parts[1].lower() == "stop":
-                return self._stop_console(int(parts[2]))
-            if len(parts) >= 2:
-                try:
-                    port = int(parts[1])
-                except ValueError:
-                    return {"ok": False, "error": f"无效端口：{parts[1]!r}"}
-                return self._start_console(port)
-            return {"ok": False, "error": "用法：webrun <port> 或 webrun stop <port>"}
-
-        return {"ok": False, "error": f"未知命令 {head!r}，输入 help 查看可用命令"}
-
-    def _start_console(self, port: int) -> dict[str, Any]:
-        """在指定端口启动 Web 控制台。"""
-        if port in self._consoles:
-            return {"ok": True, "message": "控制台已在运行", "url": f"http://localhost:{port}/"}
-        from thinkstack.runtime.webconsole import WebConsole
-
-        console = WebConsole(self.stack, host=self.host, port=port)
-        try:
-            console.start()
-        except OSError as exc:
-            return {"ok": False, "error": f"端口 {port} 启动失败：{exc}"}
-        self._consoles[port] = console
-        return {
-            "ok": True,
-            "message": "Web 控制台已开启",
-            "url": f"http://localhost:{port}/",
-            "port": port,
-        }
-
-    def _stop_console(self, port: int) -> dict[str, Any]:
-        """停止指定端口的 Web 控制台。"""
-        console = self._consoles.pop(port, None)
-        if console is None:
-            return {"ok": False, "error": f"端口 {port} 上没有运行中的控制台"}
-        console.shutdown()
-        return {"ok": True, "message": f"端口 {port} 的控制台已停止"}
 
     # ---------------------------------------------------------------- 信息查询
 
@@ -388,6 +328,9 @@ class ThinkStackServer:
             "working": {"size": len(self.stack.working_memory.snapshot())},
             "long_term_backend": type(self.stack.long_term_memory).__name__,
         }
+
+    def _skills_info(self) -> dict[str, Any]:
+        return {"skills": self.stack.list_skills()}
 
 
 def _match_extension_action(path: str) -> Optional[tuple[str, str]]:

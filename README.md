@@ -17,8 +17,9 @@ ThinkStack opens every Agent component (core, tools, memory, scheduler, protocol
 - **Markdown 渲染 / Markdown rendering**：内置纯标准库的 `markdown_to_html()`，把 LLM 输出的 Markdown 一键转 HTML，附 `markdown` 工具、`MarkdownAgent` 与 REST 端点。
 - **安全隔离 / Sandbox isolation**：扩展加载/执行异常被隔离，单扩展失败不影响框架与其他扩展。
 - **架构自检 / Architecture check**：`check_architecture()` 逐层检查 Core / Expand API / Extension / Runtime 四层架构，任一层报错即返回 TS 状态码（`TS error :<code>`，状态码清单见 `E:/PC/error.txt`），并提供 `GET /api/architecture/check` 端点。
-- **内置运行时 / Built-in runtime**：9635 端口提供 REST API（含 SSE 流式、记忆 CRUD、扩展生命周期管理），`webrun <port>` 命令动态开启浅/深色 Web 控制台，`python -m thinkstack` 提供 CLI/REPL。
-- **完整测试 / Full test suite**：44 个单元测试覆盖核心与扩展机制。
+- **Agent Skill 支持 / Agent Skills**：原生支持 [Agent Skills](https://agentskills.io/specification) 开放标准（Anthropic 发起）——加载 `SKILL.md` 技能目录、渐进式披露注入上下文、内置 `skill` 工具按需取指令。
+- **内置运行时 / Built-in runtime**：9635 端口提供 REST API（含 SSE 流式、记忆 CRUD、扩展与 Skill 生命周期管理），`python -m thinkstack` 提供 CLI/REPL。Web UI 不再由框架自带，由各 Agent 应用自行铺设。
+- **完整测试 / Full test suite**：59 个单元测试覆盖核心与扩展机制。
 
 ---
 
@@ -76,10 +77,13 @@ curl -X POST http://localhost:9635/api/tools/call \
   -H "Content-Type: application/json" \
   -d '{"name":"weather","args":{"city":"北京"}}'
 
-# 开启 Web 控制台（在 8080 端口）/ open the web console on port 8080
-curl -X POST http://localhost:9635/api/command \
+# 列出已加载的 Agent Skill / list loaded agent skills
+curl http://localhost:9635/api/skills
+
+# 加载 Agent Skill（指向含 SKILL.md 的目录）/ load an agent skill
+curl -X POST http://localhost:9635/api/skills/load \
   -H "Content-Type: application/json" \
-  -d '{"command":"webrun 8080"}'
+  -d '{"path":"/path/to/my-skill"}'
 
 # Markdown 转 HTML / render markdown to HTML
 curl -X POST http://localhost:9635/api/markdown/render \
@@ -97,8 +101,8 @@ curl -X POST http://localhost:9635/api/agent/run/stream \
   -d '{"agent":"echo","input":"你好","max_iterations":3}'
 ```
 
-然后访问 `http://localhost:8080/` 查看可切换浅色/深色的 Web 控制台。
-Then visit `http://localhost:8080/` to see the light/dark web console.
+> v1.3.0 起框架不再自带 Web 控制台——Web UI 由各 Agent 应用自行铺设。
+> Since v1.3.0 the framework ships no built-in web console — the Web UI is up to each agent application.
 
 ### 3. 用代码接入
 
@@ -183,6 +187,45 @@ After registration, retrieve it from `stack.custom_schedulers`.
 
 ---
 
+## Agent Skill 支持 / Agent Skills
+
+ThinkStack 原生支持 [Agent Skills 开放标准](https://agentskills.io/specification)（Anthropic 发起维护），
+技能即一个含 `SKILL.md` 的目录：
+
+ThinkStack natively supports the [Agent Skills open standard](https://agentskills.io/specification) (initiated by Anthropic). A skill is a directory containing `SKILL.md`:
+
+```
+my-skill/
+├── SKILL.md        # 必需：YAML frontmatter（name/description）+ Markdown 指令
+├── scripts/        # 可选：可执行代码
+├── references/     # 可选：参考文档
+└── assets/         # 可选：模板与资源
+```
+
+`SKILL.md` 的 frontmatter 遵循标准字段：`name`（小写字母/数字/连字符，须与目录名一致）、`description`（必需）、`license`、`compatibility`、`metadata`、`allowed-tools`（可选）。
+
+`SKILL.md` frontmatter follows the standard fields: `name` (lowercase letters/digits/hyphens, must match the directory name), `description` (required), plus optional `license`, `compatibility`, `metadata`, `allowed-tools`.
+
+### 加载与使用 / Load & use
+
+```python
+from thinkstack import ThinkStack
+
+stack = ThinkStack()
+stack.load_skill("path/to/my-skill")   # 加载单个技能目录
+stack.load_skill_dir("path/to/skills") # 扫描目录下全部技能
+print(stack.list_skills())             # [{name, description}, ...]
+
+# 渐进式披露：Agent 循环启动时自动注入全部技能摘要（ctx["skills"]），
+# 需要完整指令时再通过内置 skill 工具按名称获取：
+result = stack.call_tool("skill", skill="my-skill")
+print(result.data)  # 完整指令 Markdown（含正文与资源清单）
+```
+
+REST 端点：`GET /api/skills`（列表）、`POST /api/skills/load`（`{"path": ...}`）、`POST /api/skills/unload`（`{"name": ...}`）。
+
+---
+
 ## Markdown 渲染 / Markdown Rendering
 
 LLM 输出多为 Markdown。ThinkStack 内置纯标准库的 `markdown_to_html()`，支持标题、加粗/斜体/删除线、行内代码、围栏代码块、链接、图片、列表、引用、表格、分隔线等常见语法。
@@ -206,7 +249,7 @@ python -m thinkstack --port 9000 # 指定端口
 python -m thinkstack --repl      # 交互式 REPL（无需 HTTP）
 ```
 
-REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k=v ...`、`arch`（架构自检，返回 TS 状态码）、`help`、`exit`。
+REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k=v ...`、`skills`（列出已加载 Agent Skill）、`arch`（架构自检，返回 TS 状态码）、`help`、`exit`。
 
 ---
 
@@ -293,7 +336,7 @@ Covers the agent loop, tool registry, memory, schedulers, and extension loading/
 ## 目录结构 / Project Layout
 
 ```
-thinkstack/        框架主包（core / expand / runtime 四层架构）
+thinkstack/        框架主包（core / expand / runtime 四层架构，含 core/skills.py）
 examples/          3 个示例扩展（工具 / 记忆 / 调度器）
 tests/             单元测试套件
 docs/              API 参考文档

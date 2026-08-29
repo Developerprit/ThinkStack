@@ -4,7 +4,8 @@
 ToolCallingAgent, MarkdownAgent, Tool, ToolResult, FunctionTool, ToolRegistry,
 tool, EmptyInput, Memory, ShortTermMemory, LongTermMemory, InMemoryLongTermMemory,
 JsonFileLongTermMemory, WorkingMemory, Scheduler, SerialScheduler, ParallelScheduler,
-PriorityScheduler, Task, TaskResult, Reasoner, EchoReasoner, markdown_to_html, ThinkStack
+PriorityScheduler, Task, TaskResult, Reasoner, EchoReasoner, markdown_to_html,
+Skill, SkillRegistry, ThinkStack
 """
 
 from thinkstack.core.agent import (
@@ -32,6 +33,7 @@ from thinkstack.core.scheduler import (
     Task,
     TaskResult,
 )
+from thinkstack.core.skills import Skill, SkillRegistry
 from thinkstack.core.stack import ThinkStack
 from thinkstack.core.tool import (
     EmptyInput,
@@ -71,5 +73,7 @@ __all__ = [
     "Reasoner",
     "EchoReasoner",
     "markdown_to_html",
+    "Skill",
+    "SkillRegistry",
     "ThinkStack",
 ]

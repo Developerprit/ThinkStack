@@ -97,6 +97,11 @@ def iter_agent_loop(
     ctx: dict[str, Any] = {"input": task_input}
     if stack is not None:
         ctx["stack"] = stack
+        # 原生 Agent Skill：把已加载 skill 的摘要注入上下文（渐进式披露，
+        # Agent 需要完整指令时再通过内置 skill 工具按名称获取）
+        skill_context = getattr(stack, "skill_context", None)
+        if callable(skill_context):
+            ctx["skills"] = skill_context()
 
     for i in range(1, max_iter + 1):
         if hook_runner is not None:

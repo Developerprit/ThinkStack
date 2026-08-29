@@ -35,8 +35,14 @@ ThinkStack(config: Optional[Config] = None)
 | `run_agent_stream` | `run_agent_stream(agent, task_input, max_iterations=None) -> Iterator[dict]` | 流式执行 Agent 循环（供 SSE） |
 | `get_memory` | `get_memory(kind) -> Memory` | 按类别获取记忆后端（long/short/working） |
 | `check_architecture` | `check_architecture() -> dict` | 四层架构自检，返回 TS 状态码 |
+| `load_skill` | `load_skill(path) -> Skill` | 加载单个 Agent Skill 目录 |
+| `load_skill_dir` | `load_skill_dir(dir_path) -> list[Skill]` | 扫描目录下全部 Agent Skill |
+| `list_skills` | `list_skills() -> list[dict]` | 已加载 Skill 元数据摘要 |
+| `get_skill` | `get_skill(name) -> Skill` | 按名称获取 Skill |
+| `unload_skill` | `unload_skill(name) -> None` | 卸载 Skill |
+| `skill_context` | `skill_context() -> str` | 全部 Skill 摘要文本 |
 
-**属性**：`config`、`tools`、`short_term_memory`、`working_memory`、`long_term_memory`、`scheduler`、`custom_schedulers`、`is_running`。
+**属性**：`config`、`tools`、`short_term_memory`、`working_memory`、`long_term_memory`、`scheduler`、`custom_schedulers`、`skills`、`is_running`。
 
 **最小示例**
 
@@ -76,7 +82,7 @@ config = Config.from_dict({"name": "MyStack", "max_iterations": 20})
 
 子配置 `MemoryConfig`（`short_term_capacity`、`long_term_backend`、`persist_path`）、
 `SchedulerConfig`（`strategy: serial|parallel|priority`、`max_workers`）、
-`ServerConfig`（`host`、`port`、`enable_console_command`）。
+`ServerConfig`（`host`、`port`）。
 
 ---
 
@@ -328,7 +334,7 @@ print(handle.is_active)  # True
 ThinkStackServer(stack: ThinkStack, host="0.0.0.0", port=9635)
 ```
 
-方法：`start(block=False)`、`shutdown()`、`handle_command(command) -> dict`。
+方法：`start(block=False)`、`shutdown()`。
 
 REST 端点：
 
@@ -348,23 +354,71 @@ REST 端点：
 | GET | `/api/agents` | 内置与自定义 Agent 列表 |
 | GET | `/api/memory` | 记忆信息 |
 | POST | `/api/memory` | 记忆读写（`action: store/retrieve/clear`，`kind: long/short/working`） |
+| GET | `/api/skills` | 已加载 Agent Skill 列表 |
+| POST | `/api/skills/load` | 加载 Agent Skill（`{"path": ...}`） |
+| POST | `/api/skills/unload` | 卸载 Agent Skill（`{"name": ...}`） |
 | POST | `/api/markdown/render` | Markdown 转 HTML |
 | POST | `/api/agent/run` | 运行 Agent |
 | POST | `/api/agent/run/stream` | 流式运行 Agent（SSE） |
 | POST | `/api/tasks/run` | 执行调度任务 |
-| POST | `/api/command` | 命令通道（`webrun <port>` / `help`） |
 
-### `class WebConsole`
-
-```python
-WebConsole(stack: ThinkStack, host="0.0.0.0", port=8080)
-```
-
-独立的 Web 控制台服务器，内置浅色/深色管理界面，通过 `webrun <port>` 动态开启。
+> v1.3.0 起框架不再自带 Web 控制台（`WebConsole` 已移除），Web UI 由各 Agent 应用自行铺设。
+> Since v1.3.0 the framework ships no built-in web console (`WebConsole` removed) — the Web UI is up to each agent application.
 
 ---
 
-## 10. 异常体系
+## 10. Agent Skill
+
+### `class Skill`
+
+已加载的 Agent Skill（对应 skill 目录 + SKILL.md，遵循 [agentskills.io](https://agentskills.io/specification) 标准）。
+
+| 属性 | 类型 | 说明 |
+| --- | --- | --- |
+| `name` | `str` | 技能名（与目录名一致） |
+| `description` | `str` | 技能描述与使用场景 |
+| `content` | `str` | SKILL.md 正文指令 |
+| `path` | `str` | skill 根目录绝对路径 |
+| `license` / `compatibility` / `allowed_tools` | `Optional[str]` | frontmatter 可选字段 |
+| `metadata` | `dict[str, str]` | 自定义元数据 |
+
+**类方法**
+
+```python
+Skill.from_skill_dir(path: str) -> Skill   # 从 skill 目录加载（解析 SKILL.md）
+```
+
+**实例方法**：`read_resource(rel_path) -> str`、`resource_path(rel_path) -> str`、`resource_list() -> list[str]`、`to_markdown() -> str`（完整指令文本）、`summary() -> dict`（name + description 摘要）。
+
+### `class SkillRegistry`
+
+| 方法 | 签名 | 说明 |
+| --- | --- | --- |
+| `load` | `load(path) -> Skill` | 加载单个 skill 目录 |
+| `load_dir` | `load_dir(dir_path) -> list[Skill]` | 扫描目录下全部技能 |
+| `register` | `register(skill) -> Skill` | 注册实例 |
+| `get` | `get(name) -> Skill` | 按名称获取 |
+| `unload` | `unload(name) -> None` | 卸载 |
+| `list_skills` | `list_skills() -> list[Skill]` | 全部技能 |
+| `summaries` | `summaries() -> list[dict]` | 元数据摘要 |
+| `context` | `context() -> str` | 全量摘要文本（供 Agent 上下文注入） |
+
+### `ThinkStack` 集成
+
+| 方法 | 说明 |
+| --- | --- |
+| `load_skill(path)` | 加载单个 skill 目录 |
+| `load_skill_dir(dir_path)` | 扫描目录下全部技能 |
+| `list_skills() -> list[dict]` | 技能元数据摘要 |
+| `get_skill(name) -> Skill` | 按名称获取 |
+| `unload_skill(name)` | 卸载 |
+| `skill_context() -> str` | 摘要文本（Agent 循环自动注入 `ctx["skills"]`） |
+
+内置 `skill` 工具（入参 `skill`）：按名称返回完整指令 Markdown，实现渐进式披露。
+
+---
+
+## 11. 异常体系
 | 异常 | 继承 | 触发场景 |
 | --- | --- | --- |
 | `ThinkStackError` | `Exception` | 基类 |
@@ -376,11 +430,12 @@ WebConsole(stack: ThinkStack, host="0.0.0.0", port=8080)
 | `ExtensionLoadError` | `ThinkStackError` | 扩展加载失败 |
 | `ExtensionValidationError` | `ThinkStackError` | 签名校验失败 |
 | `ExtensionAccessError` | `ThinkStackError` | 越权访问 |
+| `SkillError` | `ThinkStackError` | Agent Skill 加载/解析/校验错误 |
 | `TSStatusError` | `ThinkStackError` | 携带 TS 状态码的框架错误（`exc.ts_code`） |
 
 ---
 
-## 11. TS 状态码
+## 12. TS 状态码
 
 状态码清单见 `E:/PC/error.txt`。对外统一格式：
 

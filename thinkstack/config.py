@@ -36,9 +36,6 @@ class ServerConfig(BaseModel):
 
     host: str = Field(default="0.0.0.0", description="监听地址")
     port: int = Field(default=9635, ge=1, le=65535, description="REST API 监听端口")
-    enable_console_command: bool = Field(
-        default=True, description="是否允许通过命令通道开启 Web 控制台"
-    )
 
 
 class LogConfig(BaseModel):
