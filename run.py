@@ -61,6 +61,8 @@ def main() -> None:
     server = ThinkStackServer(stack, host=args.host, port=args.port)
     server.start(block=False)
 
+    arch = stack.check_architecture()
+    print("[archcheck] " + arch["ts_status"] + (" — " + arch["message"] if not arch["ok"] else " — all layers healthy"))
     print("=" * 60)
     print("ThinkStack Agent Framework is running")
     print(f"  REST API : http://{args.host}:{args.port}")

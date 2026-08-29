@@ -47,7 +47,7 @@ class ThinkStackServer:
         stack = self.stack
 
         class Handler(BaseHTTPRequestHandler):
-            server_version = "ThinkStack/1.1"
+            server_version = "ThinkStack/1.2"
 
             def _send(self, status: int, payload: Any) -> None:
                 body = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -93,9 +93,18 @@ class ThinkStackServer:
                 path = urlparse(self.path).path
                 try:
                     if method == "GET" and path == "/api/health":
-                        return self._send(200, {"status": "ok", "running": stack.is_running})
+                        return self._send(
+                            200,
+                            {
+                                "status": "ok",
+                                "running": stack.is_running,
+                                "ts": "TS ok :2000",
+                            },
+                        )
                     if method == "GET" and path == "/api/info":
                         return self._send(200, server._info())
+                    if method == "GET" and path == "/api/architecture/check":
+                        return self._send(200, stack.check_architecture())
                     if method == "GET" and path == "/api/tools":
                         return self._send(200, {"tools": stack.list_tools()})
                     if method == "POST" and path == "/api/tools/call":
@@ -342,8 +351,11 @@ class ThinkStackServer:
     # ---------------------------------------------------------------- 信息查询
 
     def _info(self) -> dict[str, Any]:
+        from thinkstack import __version__  # 延迟导入，避免包初始化期的循环引用
+
         return {
             "name": self.stack.config.name,
+            "version": __version__,
             "running": self.stack.is_running,
             "agent_name": self.stack.config.agent_name,
             "max_iterations": self.stack.config.max_iterations,

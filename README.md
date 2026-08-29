@@ -16,6 +16,7 @@ ThinkStack opens every Agent component (core, tools, memory, scheduler, protocol
 - **统一扩展 API / Unified Expand API**：`@expand_hook` 装饰器 + `register_extension()`，十个扩展点覆盖完整生命周期。
 - **Markdown 渲染 / Markdown rendering**：内置纯标准库的 `markdown_to_html()`，把 LLM 输出的 Markdown 一键转 HTML，附 `markdown` 工具、`MarkdownAgent` 与 REST 端点。
 - **安全隔离 / Sandbox isolation**：扩展加载/执行异常被隔离，单扩展失败不影响框架与其他扩展。
+- **架构自检 / Architecture check**：`check_architecture()` 逐层检查 Core / Expand API / Extension / Runtime 四层架构，任一层报错即返回 TS 状态码（`TS error :<code>`，状态码清单见 `E:/PC/error.txt`），并提供 `GET /api/architecture/check` 端点。
 - **内置运行时 / Built-in runtime**：9635 端口提供 REST API（含 SSE 流式、记忆 CRUD、扩展生命周期管理），`webrun <port>` 命令动态开启浅/深色 Web 控制台，`python -m thinkstack` 提供 CLI/REPL。
 - **完整测试 / Full test suite**：44 个单元测试覆盖核心与扩展机制。
 
@@ -58,6 +59,12 @@ Info     : http://localhost:9635/api/info
 ```bash
 # 健康检查 / health
 curl http://localhost:9635/api/health
+
+# 架构自检 / architecture self-check（返回 TS 状态码，如 TS ok :2000）
+curl http://localhost:9635/api/architecture/check
+
+# 框架信息（含版本号）/ framework info
+curl http://localhost:9635/api/info
 
 # 运行 Agent / run an agent
 curl -X POST http://localhost:9635/api/agent/run \
@@ -199,7 +206,7 @@ python -m thinkstack --port 9000 # 指定端口
 python -m thinkstack --repl      # 交互式 REPL（无需 HTTP）
 ```
 
-REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k=v ...`、`help`、`exit`。
+REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k=v ...`、`arch`（架构自检，返回 TS 状态码）、`help`、`exit`。
 
 ---
 

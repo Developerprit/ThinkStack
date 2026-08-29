@@ -39,7 +39,17 @@ from thinkstack.core.scheduler import (
     TaskResult,
 )
 from thinkstack.core.tool import FunctionTool, Tool, ToolRegistry, ToolResult
-from thinkstack.errors import SchedulerError, ThinkStackError
+from thinkstack.errors import (
+    SchedulerError,
+    ThinkStackError,
+    TS_CODE_BLACKHOLE,
+    TS_CODE_EXT_API_ERROR,
+    TS_CODE_EXT_ERROR,
+    TS_CODE_OK,
+    TS_CODE_TS_ERROR,
+    TS_CODE_TS_LOST,
+    ts_status,
+)
 from thinkstack.expand.api import ExtensionRegistry
 from thinkstack.expand.handle import ExtensionHandle
 from thinkstack.expand.hooks import ExpandHook
@@ -222,6 +232,149 @@ class ThinkStack:
     def get_extension(self, name: str) -> ExtensionHandle:
         """按名称获取扩展句柄。"""
         return self._registry.get(name)
+
+    # ------------------------------------------------------------------ 架构自检
+
+    def check_architecture(self) -> dict[str, Any]:
+        """架构自检：逐层检查 Core / Expand API / Extension / Runtime 四层组件。
+
+        任一层报错即返回对应 TS 状态码（状态码定义见 thinkstack.errors，
+        原始清单见 E:/PC/error.txt）；全部通过返回 2000（TS ok :2000）。
+
+        - Core Layer 组件缺失 → 3404 TS意外丢失；核心层异常 → 3005 TS错误
+        - Expand API Layer 出错 → 1001 扩展API错误
+        - Extension Layer 出错 → 1002 扩展错误
+        - Runtime Layer 生命周期不一致 → 4000 消息发进了黑洞；异常 → 3005
+
+        返回结构：
+            {
+                "ok": bool,        # 整体是否通过
+                "ts_code": int,    # TS 状态码（2000 = 通过）
+                "ts_status": str,  # "TS ok :2000" / "TS error :<code>"
+                "message": str,    # 失败原因简述（通过时为 "OK"）
+                "layers": {        # 各层检查明细
+                    "core":      {"ok": bool, "checks": [str]},
+                    "expand":    {"ok": bool, "checks": [str]},
+                    "extension": {"ok": bool, "checks": [str]},
+                    "runtime":   {"ok": bool, "checks": [str]},
+                },
+            }
+        """
+        layers: dict[str, Any] = {}
+
+        def _record(name: str, ok: bool, checks: list[str]) -> None:
+            layers[name] = {"ok": ok, "checks": checks}
+
+        def _fail(code: int, message: str) -> dict[str, Any]:
+            return {
+                "ok": False,
+                "ts_code": code,
+                "ts_status": ts_status(code),
+                "message": message,
+                "layers": layers,
+            }
+
+        # ------------------------------- Core Layer -------------------------------
+        core_checks: list[str] = []
+        core_ok = True
+        try:
+            if self.config is None:
+                core_ok, core_checks = False, ["config is missing"]
+            else:
+                core_checks.append("config valid")
+            if core_ok:
+                for attr, label in (
+                    ("tools", "tool registry"),
+                    ("short_term_memory", "short-term memory"),
+                    ("working_memory", "working memory"),
+                    ("long_term_memory", "long-term memory"),
+                    ("scheduler", "scheduler"),
+                ):
+                    if getattr(self, attr, None) is None:
+                        core_ok, core_checks = False, [f"{label} is missing"]
+                        break
+                    core_checks.append(f"{label} present")
+            if core_ok and "markdown" not in self.tools:
+                core_ok, core_checks = False, ["builtin 'markdown' tool is missing"]
+        except Exception as exc:
+            _record("core", False, [f"exception: {exc}"])
+            return _fail(TS_CODE_TS_ERROR, f"核心层异常：{exc}")
+        _record("core", core_ok, core_checks)
+        if not core_ok:
+            return _fail(TS_CODE_TS_LOST, "核心层组件缺失：" + "; ".join(core_checks))
+
+        # ---------------------------- Expand API Layer ----------------------------
+        expand_checks: list[str] = []
+        expand_ok = True
+        try:
+            if self._registry is None:
+                expand_ok, expand_checks = False, ["extension registry is missing"]
+            else:
+                expand_checks.append("extension registry present")
+            if expand_ok:
+                hook_count = len(ExpandHook)
+                if hook_count != 10:
+                    expand_ok, expand_checks = False, [f"expected 10 hook points, got {hook_count}"]
+                else:
+                    expand_checks.append("10 hook points defined")
+            if expand_ok:
+                for fn in ("register_extension", "get_extension", "list_extensions"):
+                    if not callable(getattr(self, fn, None)):
+                        expand_ok, expand_checks = False, [f"{fn}() not callable"]
+                        break
+                    expand_checks.append(f"{fn}() callable")
+        except Exception as exc:
+            _record("expand", False, [f"exception: {exc}"])
+            return _fail(TS_CODE_EXT_API_ERROR, f"扩展API层异常：{exc}")
+        _record("expand", expand_ok, expand_checks)
+        if not expand_ok:
+            return _fail(TS_CODE_EXT_API_ERROR, "扩展API错误：" + "; ".join(expand_checks))
+
+        # ---------------------------- Extension Layer -----------------------------
+        ext_checks: list[str] = []
+        ext_ok = True
+        try:
+            handles = self.list_extensions()
+            if not handles:
+                ext_checks.append("no extensions registered")
+            for handle in handles:
+                if handle is None or not getattr(handle, "name", None):
+                    ext_ok, ext_checks = False, ["extension handle invalid (no name)"]
+                    break
+                if not getattr(handle, "is_active", False):
+                    ext_ok, ext_checks = False, [f"extension '{handle.name}' is inactive"]
+                    break
+                ext_checks.append(f"extension '{handle.name}' active")
+        except Exception as exc:
+            _record("extension", False, [f"exception: {exc}"])
+            return _fail(TS_CODE_EXT_ERROR, f"扩展层异常：{exc}")
+        _record("extension", ext_ok, ext_checks)
+        if not ext_ok:
+            return _fail(TS_CODE_EXT_ERROR, "扩展错误：" + "; ".join(ext_checks))
+
+        # ------------------------------ Runtime Layer -----------------------------
+        runtime_checks: list[str] = []
+        runtime_ok = True
+        try:
+            if self._started != self.is_running:
+                runtime_ok, runtime_checks = False, ["lifecycle state inconsistent"]
+            else:
+                runtime_checks.append("lifecycle state consistent")
+            runtime_checks.append("running" if self.is_running else "not running")
+        except Exception as exc:
+            _record("runtime", False, [f"exception: {exc}"])
+            return _fail(TS_CODE_TS_ERROR, f"运行时层异常：{exc}")
+        _record("runtime", runtime_ok, runtime_checks)
+        if not runtime_ok:
+            return _fail(TS_CODE_BLACKHOLE, "消息发进了黑洞：" + "; ".join(runtime_checks))
+
+        return {
+            "ok": True,
+            "ts_code": TS_CODE_OK,
+            "ts_status": ts_status(TS_CODE_OK),
+            "message": "OK",
+            "layers": layers,
+        }
 
     # ------------------------------------------------------------------ 执行循环
 

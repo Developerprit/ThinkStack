@@ -53,6 +53,8 @@ def run_server(args: argparse.Namespace) -> None:
     server = ThinkStackServer(stack, host=args.host, port=args.port)
     server.start(block=False)
 
+    arch = stack.check_architecture()
+    print("[archcheck] " + arch["ts_status"] + (" — " + arch["message"] if not arch["ok"] else " — all layers healthy"))
     print("=" * 60)
     print("ThinkStack Agent Framework is running")
     print(f"  REST API : http://{args.host}:{args.port}")
@@ -97,8 +99,16 @@ def run_repl() -> None:
             print("  echo <text>          Run the echo agent")
             print("  md <markdown>        Render markdown to HTML")
             print("  tool <name> k=v ...  Call a tool (e.g. tool weather city=Beijing)")
+            print("  arch                 Run the architecture self-check (TS status code)")
             print("  help                 Show this help")
             print("  exit                 Quit")
+            continue
+        if cmd == "arch":
+            result = stack.check_architecture()
+            line = result["ts_status"]
+            if not result["ok"]:
+                line += f" ({result['message']})"
+            print(f"[archcheck] {line}")
             continue
         if cmd == "echo":
             result = stack.run_agent(EchoAgent(), rest or "hello", max_iterations=1)

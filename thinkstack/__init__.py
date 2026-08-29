@@ -6,7 +6,7 @@ ShortTermMemory, LongTermMemory, InMemoryLongTermMemory, JsonFileLongTermMemory,
 WorkingMemory, Scheduler, SerialScheduler, ParallelScheduler, PriorityScheduler,
 Task, TaskResult, Reasoner, EchoReasoner, markdown_to_html, ExpandHook, expand_hook,
 register_extension, ExtensionHandle, ExtensionRegistry, ThinkStackServer, WebConsole,
-以及 ThinkStackError 异常体系。
+ThinkStackError 异常体系，以及 TS 状态码（ts_status / TSStatusError / TS_CODE_*）。
 """
 
 from thinkstack.config import Config
@@ -42,6 +42,7 @@ from thinkstack.core import (
     tool,
 )
 from thinkstack.errors import (
+    TSStatusError,
     AgentError,
     ConfigError,
     ExtensionAccessError,
@@ -51,6 +52,19 @@ from thinkstack.errors import (
     SchedulerError,
     ThinkStackError,
     ToolError,
+    TS_CODE_BLACKHOLE,
+    TS_CODE_EXT_API_ERROR,
+    TS_CODE_EXT_ERROR,
+    TS_CODE_KEY_ERROR,
+    TS_CODE_LLM_TOKEN_EXHAUSTED,
+    TS_CODE_MODEL_404,
+    TS_CODE_OK,
+    TS_CODE_TS_ERROR,
+    TS_CODE_TS_LOST,
+    TS_CODE_UNKNOWN,
+    TS_CODE_URL_404,
+    TS_CODE_MESSAGES,
+    ts_status,
 )
 from thinkstack.expand import (
     ExpandHook,
@@ -62,7 +76,7 @@ from thinkstack.expand import (
 )
 from thinkstack.runtime import ThinkStackServer, WebConsole
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 __all__ = [
     "ThinkStack",
@@ -112,5 +126,19 @@ __all__ = [
     "ExtensionLoadError",
     "ExtensionValidationError",
     "ExtensionAccessError",
+    "TSStatusError",
+    "ts_status",
+    "TS_CODE_OK",
+    "TS_CODE_EXT_API_ERROR",
+    "TS_CODE_EXT_ERROR",
+    "TS_CODE_LLM_TOKEN_EXHAUSTED",
+    "TS_CODE_URL_404",
+    "TS_CODE_MODEL_404",
+    "TS_CODE_KEY_ERROR",
+    "TS_CODE_TS_ERROR",
+    "TS_CODE_TS_LOST",
+    "TS_CODE_BLACKHOLE",
+    "TS_CODE_UNKNOWN",
+    "TS_CODE_MESSAGES",
     "__version__",
 ]

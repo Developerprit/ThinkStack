@@ -34,6 +34,7 @@ ThinkStack(config: Optional[Config] = None)
 | `list_agents` | `list_agents() -> list[str]` | 列出自定义 Agent 名称 |
 | `run_agent_stream` | `run_agent_stream(agent, task_input, max_iterations=None) -> Iterator[dict]` | 流式执行 Agent 循环（供 SSE） |
 | `get_memory` | `get_memory(kind) -> Memory` | 按类别获取记忆后端（long/short/working） |
+| `check_architecture` | `check_architecture() -> dict` | 四层架构自检，返回 TS 状态码 |
 
 **属性**：`config`、`tools`、`short_term_memory`、`working_memory`、`long_term_memory`、`scheduler`、`custom_schedulers`、`is_running`。
 
@@ -333,8 +334,9 @@ REST 端点：
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/health` | 健康检查 |
-| GET | `/api/info` | 框架信息 |
+| GET | `/api/health` | 健康检查（含 TS 状态码） |
+| GET | `/api/info` | 框架信息（含版本号） |
+| GET | `/api/architecture/check` | 架构自检，返回 TS 状态码 |
 | GET | `/api/tools` | 工具列表 |
 | POST | `/api/tools/call` | 调用工具（同步） |
 | POST | `/api/tools/acall` | 调用工具（异步） |
@@ -374,3 +376,84 @@ WebConsole(stack: ThinkStack, host="0.0.0.0", port=8080)
 | `ExtensionLoadError` | `ThinkStackError` | 扩展加载失败 |
 | `ExtensionValidationError` | `ThinkStackError` | 签名校验失败 |
 | `ExtensionAccessError` | `ThinkStackError` | 越权访问 |
+| `TSStatusError` | `ThinkStackError` | 携带 TS 状态码的框架错误（`exc.ts_code`） |
+
+---
+
+## 11. TS 状态码
+
+状态码清单见 `E:/PC/error.txt`。对外统一格式：
+
+- 通过：`TS ok :2000`
+- 失败：`TS error :<code>`
+
+```python
+from thinkstack import ts_status, TS_CODE_EXT_ERROR
+
+ts_status(2000)   # 'TS ok :2000'
+ts_status(1002)   # 'TS error :1002'
+```
+
+### `ts_status(code: int) -> str`
+
+生成 TS 状态字符串；`2000` 返回 `TS ok :2000`，其余返回 `TS error :<code>`。
+
+### `class TSStatusError(ThinkStackError)`
+
+携带状态码的框架异常，`exc.ts_code` 保存状态码，`code` 为 `"TS_<code>"`：
+
+```python
+from thinkstack import TSStatusError, TS_CODE_TS_ERROR, ts_status
+
+try:
+    raise TSStatusError("核心层组件缺失", ts_code=TS_CODE_TS_ERROR)
+except TSStatusError as exc:
+    print(exc.ts_code)      # 3005
+    print(ts_status(exc.ts_code))  # 'TS error :3005'
+```
+
+### 状态码常量
+
+| 常量 | 值 | 含义 |
+| --- | --- | --- |
+| `TS_CODE_EXT_API_ERROR` | 1001 | 扩展API错误（API本身错误） |
+| `TS_CODE_EXT_ERROR` | 1002 | 扩展错误 |
+| `TS_CODE_OK` | 2000 | OK,没问题 |
+| `TS_CODE_LLM_TOKEN_EXHAUSTED` | 3001 | LLM的token用没了 |
+| `TS_CODE_URL_404` | 3002 | URL 404 |
+| `TS_CODE_MODEL_404` | 3003 | 模型ID 404 |
+| `TS_CODE_KEY_ERROR` | 3004 | key错误 |
+| `TS_CODE_TS_ERROR` | 3005 | TS错误 |
+| `TS_CODE_TS_LOST` | 3404 | TS意外丢失 |
+| `TS_CODE_BLACKHOLE` | 4000 | 消息发进了黑洞 |
+| `TS_CODE_UNKNOWN` | 8000 | 未知错误 |
+
+`TS_CODE_MESSAGES` 为状态码 → 中文描述映射，`TS_CODE_*` 常量均可从 `thinkstack` 顶层导入。
+
+### 架构自检（check_architecture）
+
+`stack.check_architecture()` 逐层检查四层架构：
+
+| 层 | 检查内容 | 失败状态码 |
+| --- | --- | --- |
+| Core（核心层） | 配置、工具注册表、三类记忆、调度器、内置 markdown 工具 | 3404 TS意外丢失 / 3005 TS错误 |
+| Expand API（扩展接口层） | 扩展注册表、十个扩展点、注册 API 可调用性 | 1001 扩展API错误 |
+| Extension（扩展层） | 已注册扩展句柄有效且激活 | 1002 扩展错误 |
+| Runtime（运行时层） | 生命周期状态一致性 | 4000 消息发进了黑洞 / 3005 TS错误 |
+
+返回结构：
+
+```json
+{
+  "ok": true,
+  "ts_code": 2000,
+  "ts_status": "TS ok :2000",
+  "message": "OK",
+  "layers": {
+    "core": {"ok": true, "checks": ["config valid", "tool registry present", "..."]},
+    "expand": {"ok": true, "checks": ["..."]},
+    "extension": {"ok": true, "checks": ["..."]},
+    "runtime": {"ok": true, "checks": ["..."]}
+  }
+}
+```
