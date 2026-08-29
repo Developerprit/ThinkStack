@@ -224,6 +224,60 @@ REPL 命令（英文输出）：`echo <text>`、`md <markdown>`、`tool <name> k
 
 ---
 
+## TS 状态码 / TS Status Codes
+
+ThinkStack 用统一的状态码表达错误与健康状态，对外格式：
+
+- 通过 / OK：`TS ok :2000`
+- 报错 / Error：`TS error :<code>`
+
+状态码清单源自 `E:/PC/error.txt`，常量与工具函数均从 `thinkstack` 顶层导出。
+
+Status codes follow a unified format — `TS ok :2000` on success, `TS error :<code>` on failure. The list originates from `E:/PC/error.txt`; all constants and helpers are exported from the `thinkstack` package top level.
+
+| 状态码 / Code | 含义 / Meaning | 常量 / Constant |
+| --- | --- | --- |
+| `1001` | 扩展API错误（API本身错误）/ Extension API error | `TS_CODE_EXT_API_ERROR` |
+| `1002` | 扩展错误 / Extension error | `TS_CODE_EXT_ERROR` |
+| `2000` | OK,没问题 / OK | `TS_CODE_OK` |
+| `3001` | LLM的token用没了 / LLM token exhausted | `TS_CODE_LLM_TOKEN_EXHAUSTED` |
+| `3002` | URL 404 | `TS_CODE_URL_404` |
+| `3003` | 模型ID 404 / Model ID 404 | `TS_CODE_MODEL_404` |
+| `3004` | key错误 / Key error | `TS_CODE_KEY_ERROR` |
+| `3005` | TS错误 / TS error | `TS_CODE_TS_ERROR` |
+| `3404` | TS意外丢失 / TS unexpectedly lost | `TS_CODE_TS_LOST` |
+| `4000` | 消息发进了黑洞 / Message lost to the black hole | `TS_CODE_BLACKHOLE` |
+| `8000` | 未知错误 / Unknown error | `TS_CODE_UNKNOWN` |
+
+`TS_CODE_MESSAGES` 为状态码 → 中文描述映射。
+
+### 架构自检 / Architecture self-check
+
+`stack.check_architecture()` 逐层检查四层架构，任一层报错即返回对应 TS 状态码，全部通过返回 2000：
+
+| 层 / Layer | 失败状态码 / Failure code |
+| --- | --- |
+| Core（核心层） | `3404` TS意外丢失 / `3005` TS错误 |
+| Expand API（扩展接口层） | `1001` 扩展API错误 |
+| Extension（扩展层） | `1002` 扩展错误 |
+| Runtime（运行时层） | `4000` 消息发进了黑洞 / `3005` TS错误 |
+
+```python
+from thinkstack import ThinkStack, ts_status
+
+stack = ThinkStack()
+result = stack.check_architecture()
+print(result["ts_status"])   # 'TS ok :2000'（健康）/'TS error :1002'（报错）
+print(ts_status(1002))       # 'TS error :1002'
+```
+
+```bash
+# 通过 REST 端点获取架构自检结果
+curl http://localhost:9635/api/architecture/check
+```
+
+---
+
 ## 测试 / Tests
 
 ```bash
